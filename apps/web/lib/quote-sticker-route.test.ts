@@ -12,7 +12,7 @@ test("animated quote accepts a sticker upload and preserves its editable text an
   t.after(async () => { process.chdir(cwd); await rm(root, { recursive: true, force: true }); });
   await writeFile(join(root, "pnpm-workspace.yaml"), "packages: []");
   const project = await Project.create({ topic: "Sticker", hosts: structuredClone(DEFAULT_HOSTS) }, root, "episode");
-  project.state.broll = { cues: [{ id: "quote", type: "quote", textTemplate: "comic", start: 2, end: 4, title: "薪水 leh？" }] };
+  project.state.broll = { cues: [{ id: "quote", type: "quote", textTemplate: "comic", stickerDirection: { decision: "existing", stickerId: "shocked", contextKey: "old-context" }, start: 2, end: 4, title: "薪水 leh？" }] };
   await project.save();
   process.chdir(root);
   const params = { params: Promise.resolve({ slug: "episode", cueId: "quote" }) };
@@ -26,6 +26,7 @@ test("animated quote accepts a sticker upload and preserves its editable text an
   assert.equal(cue.start, 2);
   assert.equal(cue.end, 4);
   assert.equal(cue.textTemplate, "comic");
+  assert.equal(cue.stickerDirection, undefined);
   assert.match(cue.imagePath!, /^broll\/upload-.*\.png$/);
   assert.deepEqual(await readFile(project.abs(cue.imagePath!)), Buffer.from(bytes));
   const rejected = await POST(new Request("http://localhost/api/projects/episode/broll/quote/regenerate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ imagePrompt: "A sticker" }) }), params);

@@ -227,3 +227,15 @@ The direct CLI also accepts `--broll-source pexels`. API/worker configurations u
 External automation can search `GET /api/v1/stock/pexels?query=office%20worker&aspect=9:16&page=1`, then apply a result with `POST /api/v1/projects/<slug>/broll/<cueId>/pexels` and JSON `{ "id": 12345 }`. Use the normal Podframes Bearer token and an idempotency key for writes. The server looks up the chosen ID again before downloading, so clients never supply arbitrary provider URLs or the Pexels credential.
 
 [Videos provided by Pexels](https://www.pexels.com). [Official API documentation](https://www.pexels.com/api/documentation/).
+
+## Automatic quote stickers
+
+Quote sticker direction is enabled by default with `options.autoStickers = true`. During the B-roll stage, the selected writing model reads the conversation and chooses artwork for short quote/reaction beats. It reuses a matching saved sticker or directs a new transparent image through the local Codex subscription session. It can leave serious or sensitive moments undecorated.
+
+The project saves each decision before image generation, then saves the completed artwork. Newly generated assets and their descriptions live in `library/stickers/` and are available to later episodes. At most two new sticker images are generated for an episode. Existing artwork is reused without another image generation call. Keep the Mac's Codex login active even when scripts are written with Claude or an API model.
+
+The studio and CLI/worker use the same stage. A template carries the setting into new episodes. To disable it, switch off **Automatically direct quote stickers**, set `options.autoStickers = false`, or pass `--no-stickers` to the direct CLI or `scripts/generate-podcast.mjs`.
+
+Manual sticker uploads remain usable. Removing a sticker records an explicit undecorated choice, so resuming the same plan respects that edit. Regenerating the entire beat plan makes new editorial decisions.
+
+Quote cards and stickers occupy separate layout slots. Preview and export share the same portrait/landscape geometry, with reserved upper host space and a separate caption band. This layout targets the studio's standard podcast framing. Review custom close-ups or imported footage whose subjects sit outside that framing.

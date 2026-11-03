@@ -48,6 +48,7 @@ export async function POST(
       await mkdir(project.abs("broll"), { recursive: true });
       await writeFile(project.abs(rel), bytes);
       cue.imagePath = rel;
+      delete cue.stickerDirection;
       delete cue.videoPath;
       delete cue.pexels;
       delete cue.sourceUrl;

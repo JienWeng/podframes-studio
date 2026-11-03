@@ -223,6 +223,7 @@ const OPTION_INVALIDATION = {
   showIntro: "visualTreatment",
   showBroll: "visualTreatment",
   showGraphics: "visualTreatment",
+  autoStickers: "visualTreatment",
   captionStyle: "captions",
   captionColor: "captions",
   visualTreatment: "visualTreatment",
@@ -321,3 +322,5 @@ export function animatedTextSvg(template: string, text: string): string {
     : '<path d="m28 65 69 10v113l-69 17 19-72Z M612 65l-69 10v113l69 17-19-72Z" fill="#eaa45c" stroke="#54311f" stroke-width="5"/><rect x="75" y="41" width="490" height="155" rx="25" fill="#fff1c9" stroke="#54311f" stroke-width="6"/><g fill="#ff9bb0" stroke="#fff" stroke-width="3"><path d="m91 9 11 19 22-2-14 17 8 21-22-8-17 15 1-23-19-12 22-5Z"/><path d="m549 168 10 17 20-2-12 16 7 19-20-7-16 13 1-20-17-11 20-5Z"/></g>';
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 240" role="img" aria-label="${escape(text)}">${art}<g fill="#26212b" stroke="#fff" stroke-width="3" paint-order="stroke" font-family="Noto Sans SC, PingFang SC, Microsoft YaHei, sans-serif" font-weight="900" font-size="${size}" text-anchor="middle">${lines.map((line, i) => `<text x="320" y="${lines.length === 1 ? 140 : 110 + i * (size + 8)}">${escape(line)}</text>`).join("")}</g></svg>`;
 }
+
+export { quoteLayout } from "./compose/quote-layout";

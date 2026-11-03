@@ -1,3 +1,4 @@
+import { directQuoteStickers } from "./stickers";
 import { searchPexelsVideos, getPexelsVideo } from "../clients/pexels";
 import { downloadFootage } from "../clients/footage-download";
 import { importFootageFile } from "../clients/footage";
@@ -120,6 +121,7 @@ export async function runBroll(ctx: StageContext): Promise<void> {
       `Episode: "${script.title}" — about ${config.topic}. Total ${speech.durationSec.toFixed(0)}s.`,
       `Write on-screen titles, quotes, and labels in ${languageLabel(config.language ?? "en")}. Image descriptions may be in English.`,
       `Return at most ${budget} cues (${treatment.densityLabel}), non-overlapping, each 2.5–5s, spread across the episode.`,
+      ...(options.autoStickers !== false ? ["Use short quote cues for a few genuine reactions or punchlines in the dialogue. Quote artwork will be directed automatically from the conversation. Keep each quote a short faithful phrase in the episode language, ideally under 12 Chinese characters or 6 English words. Do not repeat the full spoken subtitle or decorate every turn. Use serious, sensitive or factual statements without comic embellishment."] : []),
       "Prefer stat cards for exact numbers or comparisons, and b-roll only when a concrete visual helps explain the spoken point. Never illustrate a joke literally. Fewer strong cues are better than filler; the cue count is a ceiling, not a target.",
       ...(options.brollSource === "pexels" ? ["B-roll uses real stock VIDEO from Pexels. For every broll cue, supply stockQuery with 2–6 simple English keywords describing the literal subject and action. Favor concrete everyday footage that can actually be found. Omit reuseImageId. Stock footage is illustrative and cannot establish the actual people or event in a news story."] : []),
       "For each b-roll imagePrompt, art-direct one specific shot: subject, action, environment, camera framing, light, and restrained natural colors. Vary wide establishing views and close details across the episode while keeping a coherent documentary photographic style. Compose for a small screen with one clear focal point and uncluttered edges.",
@@ -259,6 +261,7 @@ export async function runBroll(ctx: StageContext): Promise<void> {
   }
 
   project.state.broll = { cues: cleaned };
+  await directQuoteStickers(ctx);
   project.markDone("broll", {
     cues: cleaned.length,
     byType: countBy(cleaned.map((c) => c.type)),

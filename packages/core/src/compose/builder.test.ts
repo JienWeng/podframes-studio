@@ -103,6 +103,8 @@ test("buildComposition tiles already-trimmed clips on the shortened audio window
   const sticker = buildComposition({ ...input, cues: [{ id: "sticker", type: "quote", textTemplate: "burst", image: "media/sticker.png", title: '<script>alert("x")</script>', start: 0.5, end: 2 }] });
   assert.match(sticker, /animated-text/);
   assert.match(sticker, /class="quote-sticker" src="media\/sticker.png"/);
+  assert.match(sticker, /class="quote-layout" style="left:30%;top:58.5%;width:40%;height:10%"/);
+  assert.match(sticker, /<div class="text-sticker"[^>]*>.*<\/svg><\/div><img class="quote-sticker"/);
   assert.match(sticker, /quote-sticker.*sine.inOut/);
   assert.match(sticker, /back.out\(2.2\)/);
   assert.match(sticker, /&lt;script&gt;/);

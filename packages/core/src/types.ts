@@ -128,6 +128,8 @@ export interface PipelineOptions {
   showIntro: boolean;
   showBroll: boolean;
   generateBrollImages: boolean;
+  /** Automatically choose or generate relevant artwork for quote beats. */
+  autoStickers?: boolean;
   /** Source used to fill newly planned B-roll beats. */
   brollSource?: "images" | "pexels";
   showGraphics: boolean;
@@ -255,6 +257,7 @@ export interface Cue {
   type: CueType;
   /** Original animated graphic preset; text stays editable in title. */
   textTemplate?: "burst" | "comic" | "ribbon";
+  stickerDirection?: { decision: "existing" | "generate" | "none"; stickerId?: string; prompt?: string; contextKey?: string };
   /** Headline text (lower-third / stat / quote). */
   title?: string;
   /** Supporting line. */

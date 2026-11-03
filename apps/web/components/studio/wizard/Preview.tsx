@@ -1,6 +1,6 @@
 "use client";
 
-import { animatedTextSvg } from "@podframes/core/shared";
+import { animatedTextSvg, quoteLayout } from "@podframes/core/shared";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { captionMaxWords, captionMaxChars, TREATMENT_INTRO, brollMotionAt } from "@podframes/core/shared";
@@ -176,7 +176,7 @@ export function Preview() {
             {/* B-roll is a centered overlay card now (matches compose/builder.ts), not a
                 full-frame takeover — the host stays visible, so a fresh speaker-switch is
                 never erased by it. */}
-            {activeCues.map(({ cue, index }) => <CueCard key={cue.id} cue={cue} cueIndex={index} time={displayTime} color={cueColor(cue)} slug={slug} updatedAt={project?.updatedAt} treatment={visualTreatment} />)}
+            {activeCues.map(({ cue, index }) => <CueCard key={cue.id} cue={cue} cueIndex={index} time={displayTime} color={cueColor(cue)} slug={slug} updatedAt={project?.updatedAt} treatment={visualTreatment} aspectRatio={vertical ? "9:16" : "16:9"} />)}
             {region && <Karaoke region={region} time={displayTime} style={captionStyle} color={captionColor} />}
             {(project?.options.showIntro ?? visualTreatment !== "minimal") &&
               displayDuration > TREATMENT_INTRO.minEpisodeSec &&
@@ -393,7 +393,7 @@ function ClipRail({ regions, started, finished }: { regions: TurnRegion[]; start
 /** stat/quote/lower-third cards, mirroring compose/builder.ts's cueInner() so the preview
  *  matches what the real render actually draws over the (still-visible) host.
  *  `cueIndex` drives the editorial side alternation — same modulo as the render. */
-function CueCard({ cue, cueIndex, time, color, slug, updatedAt, treatment }: { cue: Cue; cueIndex: number; time: number; color: string; slug: string | null; updatedAt?: string; treatment: VisualTreatment }) {
+function CueCard({ cue, cueIndex, time, color, slug, updatedAt, treatment, aspectRatio }: { cue: Cue; cueIndex: number; time: number; color: string; slug: string | null; updatedAt?: string; treatment: VisualTreatment; aspectRatio: "9:16" | "16:9" }) {
   const footageRef = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     const video = footageRef.current;
@@ -409,15 +409,17 @@ function CueCard({ cue, cueIndex, time, color, slug, updatedAt, treatment }: { c
     const progress = Math.max(0, Math.min(1, (time - cue.start) / entry));
     const x = progress - 1;
     const bounce = 1 + 3.2 * x * x * x + 2.2 * x * x;
-    const rotation = progress < 1 ? -12 + 9 * bounce : -3 + 5 * Math.min(1, (time - cue.start - entry) / Math.max(0.01, span - entry * 2));
-    return <div className="pointer-events-none absolute inset-0 z-[35] flex items-center justify-center">
+    const sway = 0.5 - Math.cos(Math.PI * Math.max(0, Math.min(1, (time - cue.start) / span))) / 2;
+    const { container, card, sticker } = quoteLayout(aspectRatio, !!cue.imagePath && !!slug);
+    const position = (rectangle: typeof container) => ({ left: `${rectangle.x}%`, top: `${rectangle.y}%`, width: `${rectangle.width}%`, height: `${rectangle.height}%` });
+    return <div className="pointer-events-none absolute inset-0 z-[35]">
       {/* Shared SVG escapes editable text before creating markup. */}
-      <div className="relative w-[82%] drop-shadow-md" style={{ opacity: Math.min(1, (cue.end - time) / (entry / 2)), transformOrigin: "50% 65%", transform: `translateY(${28 * (1 - bounce)}px) scale(${0.2 + 0.8 * bounce}) rotate(${rotation}deg)` }}>
-        {cue.imagePath && slug && (
+      <div className="absolute" style={{ ...position(container), opacity: Math.min(1, (cue.end - time) / (entry / 2)), transformOrigin: "50% 50%", transform: `translateY(${5 * (1 - bounce)}%) scale(${0.86 + 0.14 * bounce})` }}>
+        <div className="absolute [&_svg]:block [&_svg]:h-full [&_svg]:w-full" style={{ ...position(card), filter: "drop-shadow(0 3px 0 rgba(0,0,0,.22))", transform: `rotate(${-2 + 4 * sway}deg)` }} dangerouslySetInnerHTML={{ __html: animatedTextSvg(cue.textTemplate, cue.title ?? "") }} />
+        {cue.imagePath && slug && sticker && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={mediaUrl(slug, cue.imagePath, updatedAt)} alt="" className="absolute -right-[2%] bottom-[65%] h-auto w-[34%] object-contain" style={{ transformOrigin: "50% 80%", transform: `translateY(${3 - 6 * (0.5 - Math.cos(Math.PI * (time - cue.start) / span) / 2)}%) rotate(${-6 + 12 * (0.5 - Math.cos(Math.PI * (time - cue.start) / span) / 2)}deg)` }} />
+          <img src={mediaUrl(slug, cue.imagePath, updatedAt)} alt="" className="absolute object-contain" style={{ ...position(sticker), transformOrigin: "50% 50%", transform: `translateY(${3 - 6 * sway}%) rotate(${-6 + 12 * sway}deg)` }} />
         )}
-        <div dangerouslySetInnerHTML={{ __html: animatedTextSvg(cue.textTemplate, cue.title ?? "") }} />
       </div>
     </div>;
   }

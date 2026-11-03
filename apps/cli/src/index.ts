@@ -57,6 +57,7 @@ OPTIONS
   --provider <p>       Video backend: replicate-p-video (default) | fal-ltx | heygen
   --heygen-auth <mode> subscription (default) | api
   --treatment <t>      minimal (default) | editorial | cinematic
+  --no-stickers        Disable automatic quote sticker direction
   --broll-source <s>  images (default) | pexels (requires PEXELS_API_KEY)
   --captions <s>       clean | karaoke | highlight | neon | slam | bold | gradient | boxed
   --resolution <r>     720p (default) | 1080p
@@ -165,6 +166,7 @@ async function main(): Promise<void> {
       expressiveness: { type: "string" },
       treatment: { type: "string" },
       "broll-source": { type: "string" },
+      "no-stickers": { type: "boolean" },
       captions: { type: "string" },
       resolution: { type: "string" },
       draft: { type: "boolean" },
@@ -224,6 +226,7 @@ async function main(): Promise<void> {
         ...(values.provider ? { videoProvider: values.provider as VideoProviderId } : {}),
         ...(values["heygen-auth"] ? { heygenAuth: values["heygen-auth"] as "subscription" | "api" } : {}),
         ...(values.expressiveness ? { heygenExpressiveness: values.expressiveness as "low" | "medium" | "high" } : {}),
+        ...(values["no-stickers"] ? { autoStickers: false } : {}),
         ...(values["broll-source"] ? { brollSource: values["broll-source"] as "images" | "pexels", showBroll: true } : {}),
         ...(values.treatment ? { visualTreatment: values.treatment as VisualTreatment } : {}),
         ...(values.captions ? { captionStyle: values.captions as CaptionStyle } : {}),

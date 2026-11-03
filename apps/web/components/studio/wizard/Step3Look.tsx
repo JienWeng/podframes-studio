@@ -16,6 +16,12 @@ const QUOTE_STICKERS = [
   { id: "empty-wallet", label: "Empty wallet" },
 ] as const;
 
+const STICKER_STATUS = {
+  generate: "Automatic · artwork created for this quote",
+  existing: "Automatic · matched from the sticker library",
+  none: "This quote stays without a sticker",
+} as const;
+
 const tc = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, "0")}`;
 
 // Only "broll" cues carry an image — "stat"/"quote"/"lower-third" are text cards laid
@@ -358,6 +364,11 @@ export function Step3Look() {
         })}
       </div>
 
+      <label className="mt-4 flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={options?.autoStickers !== false} disabled={disabled} onChange={(event) => void setOption({ autoStickers: event.target.checked })} />
+        Automatically direct quote stickers
+      </label>
+      <p className="mt-1 text-xs text-[var(--color-text-secondary)]">Suggest beats chooses relevant saved artwork or creates a new sticker from the conversation. This setting carries into template episodes and automation. {options?.showGraphics === false && "Enable Graphic cards above to include quote artwork in the export."}</p>
       <label className="mt-4 block text-sm">B-roll source for new beats
         <select value={options?.brollSource ?? "images"} disabled={disabled} className={inputClass} onChange={(event) => void setOption({ brollSource: event.target.value, showBroll: true })}>
           <option value="images">Codex images</option>
@@ -423,9 +434,9 @@ export function Step3Look() {
           return (
             <div key={cue.id} className="flex gap-2.5 border border-[var(--color-hairline)] p-2.5">
               <div className="grid h-16 w-12 shrink-0 place-items-center overflow-hidden bg-[var(--color-surface-2)]">
-                {cue.type === "broll" && cue.videoPath ? <video src={mediaUrl(ctx.slug!, cue.videoPath, project?.updatedAt)} muted playsInline className="h-full w-full object-cover" /> : cue.type === "broll" && cue.imagePath ? (
+                {cue.type === "broll" && cue.videoPath ? <video src={mediaUrl(ctx.slug!, cue.videoPath, project?.updatedAt)} muted playsInline className="h-full w-full object-cover" /> : cue.imagePath ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={mediaUrl(ctx.slug!, cue.imagePath, project?.updatedAt)} alt="" className="h-full w-full object-cover" />
+                  <img src={mediaUrl(ctx.slug!, cue.imagePath, project?.updatedAt)} alt="" className={`h-full w-full ${cue.type === "quote" ? "object-contain" : "object-cover"}`} />
                 ) : (
                   <span className="mono text-center text-[8px] leading-tight text-[var(--color-text-muted)]">{cue.textTemplate ? "ANIMATED TEXT" : TYPE_LABEL[cue.type]}</span>
                 )}
@@ -490,6 +501,17 @@ export function Step3Look() {
                 </label>}
                 <input value={cue.title ?? ""} disabled={disabled} onChange={patchField("title")} onBlur={() => saveCues(cues)} placeholder={cue.type === "quote" ? "quote text" : "label"} className={inputClass} />
                 {cue.textTemplate && <div className="space-y-2">
+                  <p className="text-xs text-[var(--color-text-secondary)]">{
+                    cue.stickerDirection?.decision === "generate" && !cue.imagePath
+                      ? "Automatic · new artwork will be created at export"
+                      : cue.stickerDirection ? STICKER_STATUS[cue.stickerDirection.decision]
+                      : options?.autoStickers !== false && !cue.imagePath
+                        ? "A suitable sticker will be chosen automatically at export"
+                        : "Sticker artwork"
+                  }</p>
+                  <details className="rounded-lg border border-[var(--color-hairline)] p-2">
+                    <summary className="cursor-pointer text-xs text-[var(--color-text-secondary)]">Adjust sticker</summary>
+                    <div className="mt-2 space-y-2">
                   <div className="grid grid-cols-3 gap-2">
                     {QUOTE_STICKERS.map((sticker) => <button key={sticker.id} type="button" disabled={disabled || regenId !== null} onClick={() => void attachSticker(cue, sticker.id)} className="rounded-lg border border-[var(--color-control-border)] bg-[var(--color-surface-2)] p-2 text-xs disabled:opacity-50" title={`Add ${sticker.label}`}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -507,8 +529,10 @@ export function Step3Look() {
                   {cue.imagePath && <div className="flex items-center gap-3">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={mediaUrl(ctx.slug!, cue.imagePath, project?.updatedAt)} alt="Attached sticker" className="h-16 w-16 object-contain" />
-                    <button type="button" disabled={disabled || regenId !== null} className="text-xs underline" onClick={() => void saveCues(cues.map((item, index) => index === i ? { ...item, imagePath: undefined } : item))}>Remove sticker</button>
+                    <button type="button" disabled={disabled || regenId !== null} className="text-xs underline" onClick={() => void saveCues(cues.map((item, index) => index === i ? { ...item, imagePath: undefined, stickerDirection: { decision: "none" as const } } : item))}>Remove sticker</button>
                   </div>}
+                    </div>
+                  </details>
                 </div>}
                 {cue.type !== "broll" && !cue.textTemplate && (
                   <input value={cue.subtitle ?? ""} disabled={disabled} onChange={patchField("subtitle")} onBlur={() => saveCues(cues)} placeholder="subtitle (optional)" className={inputClass} />

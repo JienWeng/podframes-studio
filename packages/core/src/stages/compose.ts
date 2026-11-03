@@ -1,3 +1,4 @@
+import { directQuoteStickers } from "./stickers";
 import { basename, extname } from "node:path";
 import { buildComposition, type ClipView } from "../compose/builder";
 import { buildCaptionGroups, scriptCaptionTurns } from "../compose/captions";
@@ -16,6 +17,7 @@ export async function runCompose(ctx: StageContext): Promise<void> {
   const { config, options, script, speech, clips, broll } = project.state;
 
   if (!script || !speech || !clips) throw new Error("compose stage requires script, speech, clips");
+  await directQuoteStickers(ctx);
 
   const aspect = config.aspectRatio ?? "16:9";
   const { width, height } = CANVAS[aspect];

@@ -1,4 +1,4 @@
-import { animatedTextSvg } from "../shared";
+import { animatedTextSvg, quoteLayout } from "../shared";
 import { providerOf } from "../types";
 import { BRAND, TREATMENT_INTRO, providerColor, brollMotion } from "../shared";
 import { planBaseTrack } from "../stages/turn-timing";
@@ -284,7 +284,7 @@ export function buildComposition(input: BuildInput): string {
         start,
         dur,
         12,
-        cueInner(cue, color),
+        cueInner(cue, color, input.height > input.width ? "9:16" : "16:9"),
         0,
         start < introDur,
       ),
@@ -293,8 +293,8 @@ export function buildComposition(input: BuildInput): string {
       const entry = Math.min(0.42, dur / 3);
       tl.push(
         `    tl.set('#${cue.id}', { opacity: 1 }, ${start});`,
-        `    tl.fromTo('#${cue.id} .text-sticker', { scale: 0.2, rotation: -12, y: 28 }, { scale: 1, rotation: -3, y: 0, duration: ${entry}, ease: 'back.out(2.2)' }, ${start});`,
-        `    tl.to('#${cue.id} .text-sticker', { rotation: 2, duration: ${Math.max(0.01, dur - entry * 2)}, ease: 'sine.inOut' }, ${r2(start + entry)});`,
+        `    tl.fromTo('#${cue.id} .quote-layout', { scale: 0.86, yPercent: 5 }, { scale: 1, yPercent: 0, duration: ${entry}, ease: 'back.out(2.2)' }, ${start});`,
+        `    tl.fromTo('#${cue.id} .text-sticker', { rotation: -2 }, { rotation: 2, duration: ${dur}, ease: 'sine.inOut' }, ${start});`,
         `    tl.to('#${cue.id}', { opacity: 0, duration: ${entry / 2} }, ${r2(end - entry / 2)});`,
         `    tl.set('#${cue.id}', { opacity: 0 }, ${end});`,
       );
@@ -363,8 +363,13 @@ export function buildComposition(input: BuildInput): string {
 function cueInner(
   cue: Cue & { image?: string },
   color: string,
+  aspectRatio: "9:16" | "16:9",
 ): string {
-  if (cue.textTemplate) return `<div class="text-sticker">${cue.image ? `<img class="quote-sticker" src="${esc(cue.image)}" alt="" />` : ""}${animatedTextSvg(cue.textTemplate, cue.title ?? "")}</div>`;
+  if (cue.textTemplate) {
+    const { container, card, sticker } = quoteLayout(aspectRatio, !!cue.image);
+    const position = (rectangle: typeof container) => `left:${rectangle.x}%;top:${rectangle.y}%;width:${rectangle.width}%;height:${rectangle.height}%`;
+    return `<div class="quote-layout" style="${position(container)}"><div class="text-sticker" style="${position(card)}">${animatedTextSvg(cue.textTemplate, cue.title ?? "")}</div>${cue.image && sticker ? `<img class="quote-sticker" src="${esc(cue.image)}" alt="" style="${position(sticker)}" />` : ""}</div>`;
+  }
   if (cue.type === "broll" && cue.image) {
     // A centered card laid OVER the avatar video, which keeps playing underneath —
     // same tier as the stat/quote/lower-third cards below, not a full-screen takeover.
@@ -443,9 +448,10 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;
    video(0) < cards incl. b-roll(20) < captions(50). B-roll is a
    centered card (not full-screen), so it shares the same tier as stat/quote/l3. */
 .cue{z-index:20}
-.overlay.cue.animated-text{z-index:35;display:flex;align-items:center;justify-content:center;padding:0;background:none}
-.text-sticker{position:relative;width:82%;transform-origin:50% 65%;filter:drop-shadow(0 6px 0 rgba(0,0,0,.22))}.text-sticker svg{width:100%;height:auto;display:block}
-.quote-sticker{position:absolute;right:-2%;bottom:65%;width:34%;height:auto;object-fit:contain;transform-origin:50% 80%}
+.overlay.cue.animated-text{z-index:35;padding:0;background:none}
+.quote-layout{position:absolute;transform-origin:50% 50%}
+.text-sticker{position:absolute;transform-origin:50% 50%;filter:drop-shadow(0 3px 0 rgba(0,0,0,.22))}.text-sticker svg{width:100%;height:100%;display:block}
+.quote-sticker{position:absolute;object-fit:contain;transform-origin:50% 50%}
 .caption{z-index:50}
 .episode-open{z-index:80;background:var(--bg);overflow:hidden}
 

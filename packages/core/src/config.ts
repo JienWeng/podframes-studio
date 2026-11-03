@@ -35,6 +35,7 @@ export const DEFAULT_OPTIONS: PipelineOptions = {
   showIntro: false,
   showBroll: true,
   generateBrollImages: true,
+  autoStickers: true,
   brollSource: "images",
   showGraphics: true,
   maxCues: 10,
