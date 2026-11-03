@@ -15,11 +15,17 @@ import {
   withProjectLock,
   clearStages,
   DEFAULT_HOSTS,
+  CodexClient,
+  codexStatus,
+  avatarPrompt,
+  MODELS,
   type Host,
 } from "@podframes/core";
 import { findRepoRoot } from "./root";
 import { isRunActiveAnywhere } from "./runs";
 import { brollUploadExtension } from "./broll-upload";
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
 
 export interface SavedCast {
   id: string;
@@ -198,6 +204,56 @@ export async function updateCast(
         throw error;
       }
       return record;
+    },
+    root,
+  );
+}
+
+export async function regenerateCastPortrait(
+  id: string,
+  version: string,
+  appearance: string,
+  signal?: AbortSignal,
+  root = findRepoRoot(),
+): Promise<Uint8Array> {
+  libraryId(id);
+  if (!appearance.trim() || appearance.length > 2000)
+    throw new Error("Describe the portrait in 1–2000 characters.");
+  return withProjectLock(
+    `cast-${id}`,
+    async () => {
+      const entry = await readCast(id, root);
+      if ((entry.revision ?? entry.updatedAt ?? entry.createdAt) !== version)
+        throw new Error(
+          "Cast changed since you opened it. Reload before regenerating.",
+        );
+      if (!(await codexStatus()))
+        throw new Error(
+          "Sign in to Codex with your ChatGPT subscription before generating a portrait.",
+        );
+      const directory = await mkdtemp(join(tmpdir(), "podframes-cast-"));
+      try {
+        const outputPath = join(directory, "portrait.png");
+        await new CodexClient({ signal }).generateImageToFile({
+          model: MODELS.imageModel,
+          prompt: avatarPrompt(
+            { ...entry.host, appearance: appearance.trim() },
+            "9:16",
+          ),
+          aspectRatio: "9:16",
+          imageSize: "1K",
+          outputPath,
+        });
+        const bytes = await readFile(outputPath);
+        if (bytes.length > 10 * 1024 * 1024)
+          throw new Error(
+            "Generated portrait exceeds 10 MB. Try a smaller image.",
+          );
+        brollUploadExtension(bytes);
+        return new Uint8Array(bytes);
+      } finally {
+        await rm(directory, { recursive: true, force: true });
+      }
     },
     root,
   );

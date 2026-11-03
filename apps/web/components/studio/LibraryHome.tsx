@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { StudioSidebar } from "./wizard/StudioSidebar";
 import { inputClass } from "./wizard/ui";
@@ -23,6 +23,18 @@ export function LibraryHome({
   const [editing, setEditing] = useState<SavedCast | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [portraitDraft, setPortraitDraft] = useState<{
+    file: File;
+    url: string;
+  } | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const generating = useRef(false);
+  useEffect(
+    () => () => {
+      if (portraitDraft) URL.revokeObjectURL(portraitDraft.url);
+    },
+    [portraitDraft],
+  );
   const templates = projects.filter((project) => project.templateReady);
 
   async function submit(body: FormData | Record<string, string>) {
@@ -55,6 +67,7 @@ export function LibraryHome({
       setLibrary(await refreshed.json());
       setAdding(false);
       setEditing(null);
+      setPortraitDraft(null);
     } catch (error) {
       setError(error instanceof Error ? error.message : "Could not save.");
     } finally {
@@ -64,7 +77,9 @@ export function LibraryHome({
 
   function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (generating.current) return;
     const data = new FormData(event.currentTarget);
+    if (portraitDraft) data.set("portrait", portraitDraft.file);
     if (section === "cast") void submit(data);
     else
       void submit({
@@ -73,6 +88,51 @@ export function LibraryHome({
         description: String(data.get("description")),
         template: String(data.get("template")),
       });
+  }
+
+  async function regeneratePortrait() {
+    if (!editing || !formRef.current || generating.current || busy) return;
+    const appearance = String(
+      new FormData(formRef.current).get("appearance") ?? "",
+    ).trim();
+    if (!appearance) {
+      setError(
+        "Describe the portrait in Appearance notes before regenerating.",
+      );
+      return;
+    }
+    generating.current = true;
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch(
+        `/api/library/cast/${editing.id}/regenerate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": crypto.randomUUID(),
+          },
+          body: JSON.stringify({
+            version: editing.revision ?? editing.updatedAt ?? editing.createdAt,
+            appearance,
+          }),
+        },
+      );
+      if (!response.ok) throw new Error(await response.text());
+      const file = new File([await response.blob()], "generated-portrait.png", {
+        type: "image/png",
+      });
+      setPortraitDraft({ file, url: URL.createObjectURL(file) });
+      formRef.current?.scrollIntoView({ block: "start" });
+    } catch (error) {
+      setError(
+        error instanceof Error ? error.message : "Portrait generation failed.",
+      );
+    } finally {
+      generating.current = false;
+      setBusy(false);
+    }
   }
 
   return (
@@ -93,6 +153,7 @@ export function LibraryHome({
           <button
             onClick={() => {
               setEditing(null);
+              setPortraitDraft(null);
               setAdding(!adding);
               setError("");
             }}
@@ -117,6 +178,7 @@ export function LibraryHome({
         )}
         {adding && (
           <form
+            ref={formRef}
             key={editing?.id ?? "new"}
             onSubmit={save}
             className="studio-editor mb-8 max-w-3xl space-y-5 p-5 sm:p-7"
@@ -144,8 +206,8 @@ export function LibraryHome({
                     />
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={editing.portraitUrl}
-                      alt={`${editing.name} current portrait`}
+                      src={portraitDraft?.url ?? editing.portraitUrl}
+                      alt={`${editing.name} ${portraitDraft ? "new portrait preview" : "current portrait"}`}
                       className="h-48 w-36 rounded-xl object-cover"
                     />
                   </>
@@ -167,6 +229,13 @@ export function LibraryHome({
                     type="file"
                     required={!editing}
                     accept="image/png,image/jpeg,image/webp"
+                    disabled={busy}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      setPortraitDraft(
+                        file ? { file, url: URL.createObjectURL(file) } : null,
+                      );
+                    }}
                     className={`${inputClass} mt-2`}
                   />
                   <span className="mt-1 block text-xs text-[var(--color-text-muted)]">
@@ -174,6 +243,14 @@ export function LibraryHome({
                     generated host from any video&apos;s Cast &amp; voice step.
                     {editing && " Choose a file to replace this portrait."}
                   </span>
+                  {portraitDraft && (
+                    <span
+                      role="status"
+                      className="mt-2 block text-sm text-[var(--color-success)]"
+                    >
+                      New portrait ready. Save changes to use it.
+                    </span>
+                  )}
                 </label>
                 <div className="grid gap-5 sm:grid-cols-2">
                   <label className="block text-sm font-medium">
@@ -225,12 +302,30 @@ export function LibraryHome({
                   Appearance notes
                   <textarea
                     name="appearance"
+                    disabled={busy}
                     defaultValue={editing?.host.appearance ?? ""}
                     maxLength={2000}
                     rows={2}
                     className={`${inputClass} mt-2`}
                   />
                 </label>
+                {editing && (
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => void regeneratePortrait()}
+                      disabled={busy}
+                      className="btn btn-ghost px-4 py-2 text-sm disabled:opacity-50"
+                    >
+                      {busy ? "Working…" : "Regenerate portrait"}
+                    </button>
+                    <p className="text-xs leading-relaxed text-[var(--color-text-muted)]">
+                      Uses your ChatGPT image allowance and Appearance notes to
+                      create a new portrait. Review it above, then save changes.
+                      Generation can take a few minutes.
+                    </p>
+                  </div>
+                )}
               </>
             ) : (
               <>
@@ -302,6 +397,7 @@ export function LibraryHome({
                 onClick={() => {
                   setAdding(false);
                   setEditing(null);
+                  setPortraitDraft(null);
                   setError("");
                 }}
                 disabled={busy}
@@ -344,6 +440,7 @@ export function LibraryHome({
                       disabled={busy}
                       onClick={() => {
                         setEditing(cast);
+                        setPortraitDraft(null);
                         setAdding(true);
                         setError("");
                         window.scrollTo({ top: 0, behavior: "smooth" });

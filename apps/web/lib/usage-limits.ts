@@ -10,6 +10,7 @@ export function generationAdmission(
     request.method !== "POST" ||
     !(
       /^\/api\/(generate|voice-preview)$/.test(path) ||
+      /^\/api\/library\/cast\/[a-f0-9-]{36}\/regenerate$/.test(path) ||
       /^\/api\/projects\/[^/]+\/(cast|script\/delivery|video\/regenerate|broll\/[^/]+\/regenerate)$/.test(
         path,
       )

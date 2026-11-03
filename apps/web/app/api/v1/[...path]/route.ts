@@ -14,6 +14,7 @@ import * as cast from "@/app/api/projects/[slug]/cast/route";
 import * as delivery from "@/app/api/projects/[slug]/script/delivery/route";
 import * as voicePreview from "@/app/api/voice-preview/route";
 import * as writingModels from "@/app/api/writing-models/route";
+import * as regeneratePortrait from "@/app/api/library/cast/[id]/regenerate/route";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,6 +25,7 @@ const routes: Array<{
   pattern: RegExp;
   module: Record<string, unknown>;
   media?: boolean;
+  handlesIdempotency?: boolean;
 }> = [
   { pattern: /^projects$/, module: projects },
   { pattern: /^projects\/(?<slug>[a-z0-9][a-z0-9-]*)$/i, module: project },
@@ -35,6 +37,11 @@ const routes: Array<{
   },
   { pattern: /^generate$/, module: generate },
   { pattern: /^library$/, module: library },
+  {
+    pattern: /^library\/cast\/(?<id>[a-f0-9-]{36})\/regenerate$/,
+    module: regeneratePortrait,
+    handlesIdempotency: true,
+  },
   {
     pattern: /^library\/cast\/(?<id>[a-f0-9-]{36})\/portrait$/,
     module: portrait,
@@ -68,11 +75,13 @@ async function dispatch(
       return new Response("Method not allowed", { status: 405 });
     const params = route.media ? { path: path.slice(1) } : (match.groups ?? {});
     try {
-      return await idempotentRequest(findRepoRoot(), request, () =>
+      const action = () =>
         (handler as Handler)(request, {
           params: Promise.resolve(params),
-        }),
-      );
+        });
+      return await (route.handlesIdempotency
+        ? action()
+        : idempotentRequest(findRepoRoot(), request, action));
     } catch {
       return new Response(
         "API operation failed. Check server logs and the project's saved stage state before retrying generation.",

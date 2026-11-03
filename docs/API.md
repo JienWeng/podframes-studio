@@ -62,6 +62,7 @@ Every POST to `/api/v1/` requires an `Idempotency-Key` with 16–128 letters, di
 | POST | `/voice-preview` | Generate a voice preview using provider credits |
 | GET, POST, PATCH | `/library` | Read Cast/Series, save or edit a host, create a series, or start an episode |
 | GET | `/library/cast/{id}/portrait` | Read a saved portrait |
+| POST | `/library/cast/{id}/regenerate` | Generate a portrait preview from appearance notes |
 | GET | `/media/{slug}/{path}` | Download project media, including byte-range requests |
 
 Operations reuse the same validation, cross-process project locks, generation cache, and billing settings as Studio. The HTTP API remains in Next.js. Full pipeline generation is queued in SQLite and executed by the separate Mac worker. Start it from the repository root with `pnpm worker`. Node 22.13 or newer is required. Queued jobs and the most recent 600 events per job survive web-server restarts. One pipeline job runs at a time. The worker must share this local repository and filesystem with the web process. Cloud-to-Mac transport and asset synchronization remain in the deployment proposal.
@@ -107,3 +108,5 @@ Project creation returns a fresh slug for every new idempotency key. Replaying a
 The connection check follows the provider model-list endpoints. [OpenAI model list](https://developers.openai.com/api/reference/resources/models/methods/list) and [Anthropic model list](https://platform.claude.com/docs/en/api/models/list).
 
 Saved cast can be edited with multipart `PATCH /api/v1/library`. Supply `id`, `version` (the saved `revision`, falling back to `updatedAt` or `createdAt` for older records), `name`, `model`, `voice`, `style`, `persona`, and `appearance`. A `portrait` file is optional. A stale version returns HTTP 409. Updates keep the cast ID and apply when the character is reused. Existing episode copies and series snapshots retain their saved settings until explicitly changed.
+
+Cast portrait regeneration accepts JSON `version` and `appearance` and requires an `Idempotency-Key` on both Studio and versioned API routes. It returns PNG bytes and uses ChatGPT image allowance. The saved cast changes only when you submit the image through the existing multipart cast-edit endpoint. Regeneration is included in the daily generation-operation limit. Use a new request key only for a deliberate new generation.
