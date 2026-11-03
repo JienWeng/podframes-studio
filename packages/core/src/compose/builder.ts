@@ -1,3 +1,4 @@
+import { animatedTextSvg } from "../shared";
 import { providerOf } from "../types";
 import { BRAND, TREATMENT_INTRO, providerColor, brollMotion } from "../shared";
 import { planBaseTrack } from "../stages/turn-timing";
@@ -279,7 +280,7 @@ export function buildComposition(input: BuildInput): string {
     overlays.push(
       overlay(
         cue.id,
-        cueCls + (cue.videoPath ? " footage-cutaway" : ""),
+        cueCls + (cue.textTemplate ? " animated-text" : "") + (cue.videoPath ? " footage-cutaway" : ""),
         start,
         dur,
         12,
@@ -288,7 +289,16 @@ export function buildComposition(input: BuildInput): string {
         start < introDur,
       ),
     );
-    if (cue.type === "broll" && cue.image) {
+    if (cue.textTemplate) {
+      const entry = Math.min(0.42, dur / 3);
+      tl.push(
+        `    tl.set('#${cue.id}', { opacity: 1 }, ${start});`,
+        `    tl.fromTo('#${cue.id} .text-sticker', { scale: 0.2, rotation: -12, y: 28 }, { scale: 1, rotation: -3, y: 0, duration: ${entry}, ease: 'back.out(2.2)' }, ${start});`,
+        `    tl.to('#${cue.id} .text-sticker', { rotation: 2, duration: ${Math.max(0.01, dur - entry * 2)}, ease: 'sine.inOut' }, ${r2(start + entry)});`,
+        `    tl.to('#${cue.id}', { opacity: 0, duration: ${entry / 2} }, ${r2(end - entry / 2)});`,
+        `    tl.set('#${cue.id}', { opacity: 0 }, ${end});`,
+      );
+    } else if (cue.type === "broll" && cue.image) {
       tl.push(`    tl.set('#${cue.id}', { opacity: 1 }, ${start});`);
       if (treatment === "cinematic") {
         tl.push(
@@ -353,6 +363,7 @@ function cueInner(
   cue: Cue & { image?: string },
   color: string,
 ): string {
+  if (cue.textTemplate) return `<div class="text-sticker">${animatedTextSvg(cue.textTemplate, cue.title ?? "")}</div>`;
   if (cue.type === "broll" && cue.image) {
     // A centered card laid OVER the avatar video, which keeps playing underneath —
     // same tier as the stat/quote/lower-third cards below, not a full-screen takeover.
@@ -431,6 +442,8 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;
    video(0) < cards incl. b-roll(20) < captions(50). B-roll is a
    centered card (not full-screen), so it shares the same tier as stat/quote/l3. */
 .cue{z-index:20}
+.overlay.cue.animated-text{z-index:35;display:flex;align-items:center;justify-content:center;padding:0;background:none}
+.text-sticker{width:82%;transform-origin:50% 65%;filter:drop-shadow(0 6px 0 rgba(0,0,0,.22))}.text-sticker svg{width:100%;height:auto;display:block}
 .caption{z-index:50}
 .episode-open{z-index:80;background:var(--bg);overflow:hidden}
 

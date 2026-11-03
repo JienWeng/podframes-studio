@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { CAPTION_STYLES, CAPTION_COLORS } from "@/lib/site";
-import { VISUAL_TREATMENTS } from "@podframes/core/shared";
+import { animatedTextSvg, TEXT_TEMPLATES, VISUAL_TREATMENTS } from "@podframes/core/shared";
 import { useDraft } from "@/components/studio/useDraft";
 import { useTransport } from "@/components/studio/transport";
 import { getProject, regenCueImage, uploadCuePhoto, mediaUrl, type Cue } from "@/components/studio/api";
@@ -23,7 +23,6 @@ export function Step3Look() {
   const options = project?.options;
   const color = options?.captionColor ?? "#22D3EE";
   const treatment = options?.visualTreatment ?? "minimal";
-  const disabled = locked || busy;
 
   // Key drafts to the values they mirror (not project.updatedAt) so an unrelated save
   // (a caption change, an image regen) can't wipe in-progress cue text edits.
@@ -32,6 +31,32 @@ export function Step3Look() {
   const [regenId, setRegenId] = useState<string | null>(null);
   const [imageError, setImageError] = useState("");
   const [videoUrls, setVideoUrls] = useState<Record<string, string>>({});
+  const [videoJob, setVideoJob] = useState<{ slug: string; cueId: string } | null>(null);
+  const disabled = locked || busy || videoJob !== null;
+  const ctxRef = useRef(ctx);
+  useEffect(() => { ctxRef.current = ctx; });
+  useEffect(() => {
+    if (!videoJob) return;
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const poll = async () => {
+      try {
+        const response = await fetch(`/api/projects/${encodeURIComponent(videoJob.slug)}/broll/${encodeURIComponent(videoJob.cueId)}/video`, { signal: controller.signal });
+        if (!response.ok) throw new Error(await response.text());
+        const result = await response.json();
+        if (result.status === "completed") {
+          await ctxRef.current.refresh();
+          if (!controller.signal.aborted) setVideoJob(null);
+        } else timer = setTimeout(() => void poll(), 5000);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setImageError(error instanceof Error ? error.message : String(error));
+        setVideoJob(null);
+      }
+    };
+    timer = setTimeout(() => void poll(), 3000);
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [videoJob]);
 
   const setOption = (patch: Record<string, unknown>) => ctx.patch({ options: patch as never });
   const saveCues = async (next: Cue[]) => {
@@ -123,6 +148,30 @@ export function Step3Look() {
       );
       if (!response.ok) throw new Error(await response.text());
       await ctx.refresh();
+    } catch (error) {
+      setImageError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setRegenId(null);
+    }
+  }
+
+  async function generateVideo(cue: Cue) {
+    if (!ctx.slug || !cue.imagePrompt?.trim()) return;
+    if (!(await ctx.confirm({
+      title: "Generate AI b-roll video?",
+      body: "Create a six-second clip with LTX using fal API credits.",
+      details: ["1080p at 25 fps, with muted clip audio.", "An existing request for this prompt resumes automatically."],
+      confirmLabel: "Generate video",
+    }))) return;
+    setRegenId(cue.id);
+    setImageError("");
+    try {
+      if (!(await ctx.patch({ cues }))) return;
+      const response = await fetch(`/api/projects/${encodeURIComponent(ctx.slug)}/broll/${encodeURIComponent(cue.id)}/video`, { method: "POST" });
+      if (!response.ok) throw new Error(await response.text());
+      const result = await response.json();
+      if (result.status === "completed") await ctx.refresh();
+      else setVideoJob({ slug: ctx.slug, cueId: cue.id });
     } catch (error) {
       setImageError(error instanceof Error ? error.message : String(error));
     } finally {
@@ -280,7 +329,7 @@ export function Step3Look() {
       {options?.showBroll === false && <p className="mt-4 text-xs text-[var(--color-text-muted)]">B-roll is hidden in this export. Enable its toggle to use these beats.</p>}
       {/* B-roll */}
       <div className="mono mb-2 mt-6 flex items-center justify-between text-[10px] tracking-[0.08em] text-[var(--color-text-muted)]">
-        <span>B-ROLL{cues.length ? ` · ${cues.length}` : ""}</span>
+        <span>VISUAL BEATS{cues.length ? ` · ${cues.length}` : ""}</span>
         {cues.length > 0 && <button onClick={() => saveCues([])} disabled={disabled} className="text-[var(--color-text-muted)] hover:text-[var(--color-danger)] disabled:opacity-40">clear all</button>}
       </div>
 
@@ -306,12 +355,25 @@ export function Step3Look() {
       >
         + Add footage / reaction beat
       </button>
+      <div className="mt-4 grid gap-2 sm:grid-cols-3">
+        {TEXT_TEMPLATES.map((preset) => <button key={preset.value} type="button" disabled={disabled || duration <= 0} className="rounded-xl border border-[var(--color-control-border)] bg-[var(--color-surface-2)] p-3 text-left text-xs hover:border-[var(--color-accent)] disabled:opacity-50" onClick={() => {
+          const start = Math.max(0, Math.min(time, duration - 0.3));
+          const next: Cue[] = [...cues, { id: `text-${crypto.randomUUID()}`, type: "quote", textTemplate: preset.value, title: "真的假的？", start, end: Math.min(duration, start + 2) }];
+          setCues(next);
+          void ctx.patch({ cues: next, options: { showGraphics: true } });
+        }}>
+          <div aria-hidden="true" dangerouslySetInnerHTML={{ __html: animatedTextSvg(preset.value, "真的假的？") }} />
+          <span className="mt-2 block font-semibold">+ {preset.label}</span>
+        </button>)}
+      </div>
+      <p className="mt-2 text-xs text-[var(--color-text-muted)]">Three original vector templates. Edit the words and drag the timing handles. Graphic overlays can be switched off above.</p>
       <p className="mt-2 text-xs text-[var(--color-text-muted)]">
         Use short reaction shots, cutaways or reference clips. Upload MP4/WebM
         footage or paste a direct HTTPS video link. Clip audio is muted so the
         hosts keep speaking.
       </p>
       {imageError && <p role="alert" className="mt-2 text-xs text-[var(--color-danger)]">{imageError}</p>}
+      {videoJob && <p role="status" className="mt-2 text-xs text-[var(--color-text-secondary)]">Generating six-second AI footage… You can return to this prompt to resume a saved request.</p>}
 
       <div className="mt-3 space-y-2">
         {cues.map((cue, i) => {
@@ -325,12 +387,12 @@ export function Step3Look() {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={mediaUrl(ctx.slug!, cue.imagePath, project?.updatedAt)} alt="" className="h-full w-full object-cover" />
                 ) : (
-                  <span className="mono text-center text-[8px] leading-tight text-[var(--color-text-muted)]">{TYPE_LABEL[cue.type]}</span>
+                  <span className="mono text-center text-[8px] leading-tight text-[var(--color-text-muted)]">{cue.textTemplate ? "ANIMATED TEXT" : TYPE_LABEL[cue.type]}</span>
                 )}
               </div>
               <div className="min-w-0 flex-1 space-y-1.5">
                 <div className="flex items-center gap-2">
-                  <span className="mono border border-[var(--color-hairline)] px-1 text-[9px] tracking-[0.04em] text-[var(--color-text-muted)]">{TYPE_LABEL[cue.type]}</span>
+                  <span className="mono border border-[var(--color-hairline)] px-1 text-[9px] tracking-[0.04em] text-[var(--color-text-muted)]">{cue.textTemplate ? "ANIMATED TEXT" : TYPE_LABEL[cue.type]}</span>
                   <button onClick={() => saveCues(cues.filter((_, j) => j !== i))} disabled={disabled} className="ml-auto text-xs text-[var(--color-text-muted)] hover:text-[var(--color-danger)] disabled:opacity-40" title="Remove" aria-label={`Remove ${cue.type} cue`}>✕</button>
                 </div>
 
@@ -355,7 +417,7 @@ export function Step3Look() {
                     onMouseUp={commitCues}
                     onTouchEnd={commitCues}
                     className="cue-range absolute inset-0 h-4 w-full"
-                    aria-label={`${TYPE_LABEL[cue.type]} cue start`}
+                    aria-label={`${cue.textTemplate ? "ANIMATED TEXT" : TYPE_LABEL[cue.type]} cue start`}
                   />
                   <input
                     type="range"
@@ -369,7 +431,7 @@ export function Step3Look() {
                     onMouseUp={commitCues}
                     onTouchEnd={commitCues}
                     className="cue-range absolute inset-0 h-4 w-full"
-                    aria-label={`${TYPE_LABEL[cue.type]} cue end`}
+                    aria-label={`${cue.textTemplate ? "ANIMATED TEXT" : TYPE_LABEL[cue.type]} cue end`}
                   />
                 </div>
                 <div className="mono flex items-center justify-between text-[9px] text-[var(--color-text-muted)]">
@@ -380,8 +442,14 @@ export function Step3Look() {
                 {cue.type === "stat" && (
                   <input value={cue.figure ?? ""} disabled={disabled} onChange={patchField("figure")} onBlur={() => saveCues(cues)} placeholder="figure, e.g. 42%" className={inputClass} />
                 )}
+                {cue.type === "quote" && <label className="block text-xs text-[var(--color-text-secondary)]">Text template
+                  <select aria-label="Text template" value={cue.textTemplate ?? ""} disabled={disabled} className={inputClass} onChange={(event) => void saveCues(cues.map((item, index) => index === i ? { ...item, textTemplate: event.target.value ? event.target.value as Cue["textTemplate"] : undefined } : item))}>
+                    <option value="">Plain quote</option>
+                    {TEXT_TEMPLATES.map((preset) => <option key={preset.value} value={preset.value}>{preset.label}</option>)}
+                  </select>
+                </label>}
                 <input value={cue.title ?? ""} disabled={disabled} onChange={patchField("title")} onBlur={() => saveCues(cues)} placeholder={cue.type === "quote" ? "quote text" : "label"} className={inputClass} />
-                {cue.type !== "broll" && (
+                {cue.type !== "broll" && !cue.textTemplate && (
                   <input value={cue.subtitle ?? ""} disabled={disabled} onChange={patchField("subtitle")} onBlur={() => saveCues(cues)} placeholder="subtitle (optional)" className={inputClass} />
                 )}
                 {cue.type === "broll" && (
@@ -424,8 +492,9 @@ export function Step3Look() {
                 )}
                 {cue.type === "broll" && (
                   <div className="flex gap-2">
-                    <textarea value={cue.imagePrompt ?? ""} disabled={disabled} onChange={(e) => setCues((c) => c.map((x, j) => (j === i ? { ...x, imagePrompt: e.target.value } : x)))} rows={2} placeholder="image prompt" className={`${inputClass} resize-none`} />
+                    <textarea value={cue.imagePrompt ?? ""} disabled={disabled} onChange={(e) => setCues((c) => c.map((x, j) => (j === i ? { ...x, imagePrompt: e.target.value } : x)))} rows={2} maxLength={2000} placeholder="Describe the image or video" aria-label="AI image or video prompt" className={`${inputClass} resize-none`} />
                     <button onClick={() => regen(cue)} disabled={disabled || options?.generateBrollImages === false || !cue.imagePrompt || regenId !== null} className="btn btn-ghost shrink-0 px-3 text-xs disabled:opacity-50" title="Generate an AI illustration to replace this image">{regenId === cue.id ? "…" : "Generate AI"}</button>
+                    <button type="button" onClick={() => void generateVideo(cue)} disabled={disabled || !cue.imagePrompt?.trim() || regenId !== null} className="btn btn-ghost shrink-0 px-3 text-xs disabled:opacity-50" title="Generate a six-second LTX video using fal credits">{videoJob?.cueId === cue.id ? "Generating…" : "AI video · 6s"}</button>
                   </div>
                 )}
               </div>

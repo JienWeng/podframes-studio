@@ -251,6 +251,8 @@ export interface Cue {
   start: number;
   end: number;
   type: CueType;
+  /** Original animated graphic preset; text stays editable in title. */
+  textTemplate?: "burst" | "comic" | "ribbon";
   /** Headline text (lower-third / stat / quote). */
   title?: string;
   /** Supporting line. */

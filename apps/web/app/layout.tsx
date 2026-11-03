@@ -1,17 +1,18 @@
 import type { Metadata } from "next";
-import { DM_Sans, Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
 // Shared studio typography and timecode numerals.
-const sans = DM_Sans({
-  subsets: ["latin"],
+const sans = localFont({
+  src: "../../../packages/core/assets/fonts/DMSans-Variable.woff2",
   variable: "--font-dm-sans",
-  weight: ["400", "500", "600", "700", "800"],
+  weight: "400 1000",
   display: "swap",
 });
 
-const mono = Geist_Mono({
-  subsets: ["latin"],
+const mono = localFont({
+  src: "../../../packages/core/assets/fonts/GeistMono-Variable.woff2",
+  weight: "400 600",
   variable: "--font-geist-mono",
   display: "swap",
 });

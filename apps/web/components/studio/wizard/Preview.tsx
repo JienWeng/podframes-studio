@@ -1,5 +1,7 @@
 "use client";
 
+import { animatedTextSvg } from "@podframes/core/shared";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { captionMaxWords, captionMaxChars, TREATMENT_INTRO, brollMotionAt } from "@podframes/core/shared";
 import { buildCaptionGroups, scriptCaptionTurns } from "@podframes/core/captions";
@@ -76,8 +78,7 @@ export function Preview() {
   const timedCues = trimTimeline.hasTrim ? mapCuesToTrimmedTimeline(cues, trimTimeline.segments, displayDuration) : cues;
   // Index, not just the cue — the render alternates editorial card sides by cue
   // index (compose/builder.ts cue-side-*), and the preview must mirror that.
-  const activeCueIndex = timedCues.findIndex((c) => displayTime >= c.start && displayTime < c.end);
-  const activeCue = activeCueIndex >= 0 ? timedCues[activeCueIndex] : undefined;
+  const activeCues = timedCues.map((cue, index) => ({ cue, index })).filter(({ cue }) => displayTime >= cue.start && displayTime < cue.end);
   const cueColor = (c: Cue): string => {
     const host = c.hostId ? project?.config.hosts.find((h) => h.id === c.hostId) : undefined;
     return host ? providerColor(providerOfModel(host.model)) : "#22D3EE";
@@ -175,7 +176,7 @@ export function Preview() {
             {/* B-roll is a centered overlay card now (matches compose/builder.ts), not a
                 full-frame takeover — the host stays visible, so a fresh speaker-switch is
                 never erased by it. */}
-            {activeCue && <CueCard cue={activeCue} cueIndex={activeCueIndex} time={displayTime} color={cueColor(activeCue)} slug={slug} updatedAt={project?.updatedAt} treatment={visualTreatment} />}
+            {activeCues.map(({ cue, index }) => <CueCard key={cue.id} cue={cue} cueIndex={index} time={displayTime} color={cueColor(cue)} slug={slug} updatedAt={project?.updatedAt} treatment={visualTreatment} />)}
             {region && <Karaoke region={region} time={displayTime} style={captionStyle} color={captionColor} />}
             {(project?.options.showIntro ?? visualTreatment !== "minimal") &&
               displayDuration > TREATMENT_INTRO.minEpisodeSec &&
@@ -402,6 +403,18 @@ function CueCard({ cue, cueIndex, time, color, slug, updatedAt, treatment }: { c
         Math.min(time - cue.start, video.duration - 0.01),
       );
   }, [time, cue.start, cue.videoPath]);
+  if (cue.textTemplate) {
+    const span = cue.end - cue.start;
+    const entry = Math.min(0.42, span / 3);
+    const progress = Math.max(0, Math.min(1, (time - cue.start) / entry));
+    const x = progress - 1;
+    const bounce = 1 + 3.2 * x * x * x + 2.2 * x * x;
+    const rotation = progress < 1 ? -12 + 9 * bounce : -3 + 5 * Math.min(1, (time - cue.start - entry) / Math.max(0.01, span - entry * 2));
+    return <div className="pointer-events-none absolute inset-0 z-[35] flex items-center justify-center">
+      {/* Shared SVG escapes editable text before creating markup. */}
+      <div className="w-[82%] drop-shadow-md" style={{ opacity: Math.min(1, (cue.end - time) / (entry / 2)), transformOrigin: "50% 65%", transform: `translateY(${28 * (1 - bounce)}px) scale(${0.2 + 0.8 * bounce}) rotate(${rotation}deg)` }} dangerouslySetInnerHTML={{ __html: animatedTextSvg(cue.textTemplate, cue.title ?? "") }} />
+    </div>;
+  }
   // Mirrors builder.ts: even cues sit right, odd cues left (editorial only).
   const editorialSide = cueIndex % 2 === 0 ? "justify-end" : "justify-start";
   if (cue.type === "broll") {
@@ -496,7 +509,7 @@ function TreatmentIntro({ title, hook, time, duration }: { title: string; hook: 
   const fadeStart = introDur - TREATMENT_INTRO.fadeSec;
   const opacity = time <= fadeStart ? 1 : Math.max(0, (introDur - time) / TREATMENT_INTRO.fadeSec);
   return (
-    <div className="absolute inset-0 flex flex-col justify-center overflow-hidden bg-[var(--color-bg)] px-[9%] text-left" style={{ opacity }}>
+    <div className="absolute inset-0 z-[80] flex flex-col justify-center overflow-hidden bg-[var(--color-bg)] px-[9%] text-left" style={{ opacity }}>
       <div className="absolute inset-0 opacity-40" style={{ backgroundImage: "linear-gradient(var(--color-hairline) 1px, transparent 1px), linear-gradient(90deg, var(--color-hairline) 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
       <div className="cue-pop relative">
         <div className="text-[28px] font-extrabold leading-[0.98] tracking-[-0.035em] text-[var(--color-text)]">{title}</div>
@@ -537,7 +550,7 @@ function Karaoke({ region, time, style, color }: { region: TurnRegion; time: num
   const wordGap =
     style === "slam" ? { padding: "0 0.14em" } : style === "bold" ? { padding: "0 0.1em" } : undefined;
   return (
-    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-5 pb-6 pt-10 text-center">
+    <div className="absolute inset-x-0 bottom-0 z-[50] bg-gradient-to-t from-black/75 to-transparent px-5 pb-6 pt-10 text-center">
       <p className={`${capClass(style)} line-clamp-2 break-words [text-wrap:balance]`} style={boxed ? { background: color, padding: "0.15em 0.5em" } : undefined}>
         {active.words.map((w, i) => {
           const state: WordState = time >= w.start && time < w.end ? "active" : time >= w.end ? "played" : "upcoming";

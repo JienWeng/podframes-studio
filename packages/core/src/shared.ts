@@ -301,3 +301,23 @@ export function estimateVideoCost(
   if (!p) return null;
   return seconds * p.perSecond[resolution];
 }
+
+/** Original vector artwork shared by the editor and exported video. */
+export const TEXT_TEMPLATES = [
+  { value: "burst", label: "Comic burst · 爆点" },
+  { value: "comic", label: "Speech bubble · 吐槽" },
+  { value: "ribbon", label: "Wish ribbon · 花字" },
+] as const;
+
+export function animatedTextSvg(template: string, text: string): string {
+  const escape = (value: string) => value.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+  const chars = Array.from(text);
+  const lines = chars.length > 10 ? [chars.slice(0, Math.ceil(chars.length / 2)).join(""), chars.slice(Math.ceil(chars.length / 2)).join("")] : [text];
+  const size = Math.min(62, 480 / Math.max(1, ...lines.map((line) => Array.from(line).length)));
+  const art = template === "burst"
+    ? '<path d="M46 82 115 67 101 20 205 45 256 8 313 41 403 14 435 49 558 24 535 80 613 114 554 149 588 209 470 192 412 231 343 203 254 232 202 202 78 218 99 166 27 132Z" fill="#c9f36b" stroke="#183927" stroke-width="7"/><path d="m68 44 12-20m486 200 17 15M21 191l24-8" stroke="#fff" stroke-width="9" stroke-linecap="round"/>'
+    : template === "comic"
+    ? '<path d="M57 29Q35 29 35 55V167Q35 194 64 194H160L137 230 234 194H574Q604 194 604 165V54Q604 29 575 29Z" fill="#fff5d1" stroke="#302439" stroke-width="8"/><path d="m556 4 9 16m44-9-18 17M19 65 3 56" stroke="#ff765f" stroke-width="8" stroke-linecap="round"/>'
+    : '<path d="m28 65 69 10v113l-69 17 19-72Z M612 65l-69 10v113l69 17-19-72Z" fill="#eaa45c" stroke="#54311f" stroke-width="5"/><rect x="75" y="41" width="490" height="155" rx="25" fill="#fff1c9" stroke="#54311f" stroke-width="6"/><g fill="#ff9bb0" stroke="#fff" stroke-width="3"><path d="m91 9 11 19 22-2-14 17 8 21-22-8-17 15 1-23-19-12 22-5Z"/><path d="m549 168 10 17 20-2-12 16 7 19-20-7-16 13 1-20-17-11 20-5Z"/></g>';
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 240" role="img" aria-label="${escape(text)}">${art}<g fill="#26212b" stroke="#fff" stroke-width="3" paint-order="stroke" font-family="Noto Sans SC, PingFang SC, Microsoft YaHei, sans-serif" font-weight="900" font-size="${size}" text-anchor="middle">${lines.map((line, i) => `<text x="320" y="${lines.length === 1 ? 140 : 110 + i * (size + 8)}">${escape(line)}</text>`).join("")}</g></svg>`;
+}

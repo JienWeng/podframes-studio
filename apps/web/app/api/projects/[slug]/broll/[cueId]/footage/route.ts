@@ -61,6 +61,13 @@ export async function POST(
           const input = await request.json();
           if (typeof input?.url !== "string")
             throw new Error("Supply a direct HTTPS video URL.");
+          if (input.expectedPrompt !== undefined &&
+              (typeof input.expectedPrompt !== "string" || cue.imagePrompt?.trim() !== input.expectedPrompt)) {
+            return new Response("B-roll prompt changed while the video was generating. Review the cue before replacing its media.", { status: 409 });
+          }
+          if (input.expectedAspectRatio !== undefined && input.expectedAspectRatio !== (project.state.config.aspectRatio ?? "16:9")) {
+            return new Response("Project aspect ratio changed while the video was generating. Review the cue before replacing its media.", { status: 409 });
+          }
           sourceUrl = input.url;
           bytes = await downloadFootage(sourceUrl!);
         }

@@ -15,6 +15,7 @@ import * as delivery from "@/app/api/projects/[slug]/script/delivery/route";
 import * as voicePreview from "@/app/api/voice-preview/route";
 import * as writingModels from "@/app/api/writing-models/route";
 import * as footage from "@/app/api/projects/[slug]/broll/[cueId]/footage/route";
+import * as brollVideo from "@/app/api/projects/[slug]/broll/[cueId]/video/route";
 import * as regeneratePortrait from "@/app/api/library/cast/[id]/regenerate/route";
 
 export const runtime = "nodejs";
@@ -40,6 +41,11 @@ const routes: Array<{
     pattern:
       /^projects\/(?<slug>[a-z0-9][a-z0-9-]*)\/broll\/(?<cueId>[a-z0-9-]+)\/footage$/i,
     module: footage,
+  },
+  {
+    pattern:
+      /^projects\/(?<slug>[a-z0-9][a-z0-9-]*)\/broll\/(?<cueId>[a-z0-9-]+)\/video$/i,
+    module: brollVideo,
   },
   { pattern: /^generate$/, module: generate },
   { pattern: /^library$/, module: library },

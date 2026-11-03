@@ -11,6 +11,7 @@ export type { GenerateOptions } from "./pipeline";
 
 export { Project } from "./project";
 export { slugify, slugForTopic, contentHash } from "./util/fs";
+export { pollBrollVideo } from "./clients/broll-video";
 export { validateConfig, validateOptions } from "./validate";
 export {
   DEFAULT_OPTIONS,

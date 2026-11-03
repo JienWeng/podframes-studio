@@ -11,7 +11,7 @@ export function generationAdmission(
     !(
       /^\/api\/(generate|voice-preview)$/.test(path) ||
       /^\/api\/library\/cast\/[a-f0-9-]{36}\/regenerate$/.test(path) ||
-      /^\/api\/projects\/[^/]+\/(cast|script\/delivery|video\/regenerate|broll\/[^/]+\/(regenerate|footage))$/.test(
+      /^\/api\/projects\/[^/]+\/(cast|script\/delivery|video\/regenerate|broll\/[^/]+\/(regenerate|footage|video))$/.test(
         path,
       )
     )

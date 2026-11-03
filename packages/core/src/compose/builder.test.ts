@@ -100,6 +100,15 @@ test("buildComposition tiles already-trimmed clips on the shortened audio window
   );
   assert.doesNotMatch(html, /id="episode-open"/);
 
+  const sticker = buildComposition({ ...input, cues: [{ id: "sticker", type: "quote", textTemplate: "burst", title: '<script>alert("x")</script>', start: 0.5, end: 2 }] });
+  assert.match(sticker, /animated-text/);
+  assert.match(sticker, /back.out\(2.2\)/);
+  assert.match(sticker, /&lt;script&gt;/);
+  assert.doesNotMatch(sticker, /<script>alert/);
+  assert.match(sticker, /tl.set\('#sticker', \{ opacity: 0 \}, 2\)/);
+  const hiddenSticker = buildComposition({ ...input, showGraphics: false, cues: [{ id: "sticker", type: "quote", textTemplate: "ribbon", title: "下班了", start: 0.5, end: 2 }] });
+  assert.doesNotMatch(hiddenSticker, /id="sticker"/);
+
   const cinematic = buildComposition({ ...input, visualTreatment: "cinematic" });
   assert.match(cinematic, /id="episode-open"[^>]+treatment-cinematic/);
   assert.doesNotMatch(cinematic, /PODFRAMES \/|EDITORIAL CUT|CINEMATIC CUT|STORY ROUTED/);
