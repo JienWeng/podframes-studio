@@ -1,3 +1,5 @@
+import * as pexelsSearch from "@/app/api/stock/pexels/route";
+import * as pexelsImport from "@/app/api/projects/[slug]/broll/[cueId]/pexels/route";
 import { ensureEnvLoaded } from "@podframes/core";
 import { automationAuthorization } from "@/lib/api-auth";
 import { findRepoRoot } from "@/lib/root";
@@ -29,6 +31,8 @@ const routes: Array<{
   media?: boolean;
   handlesIdempotency?: boolean;
 }> = [
+  { pattern: /^stock\/pexels$/, module: pexelsSearch },
+  { pattern: /^projects\/(?<slug>[a-z0-9][a-z0-9-]*)\/broll\/(?<cueId>[a-z0-9-]+)\/pexels$/i, module: pexelsImport },
   { pattern: /^projects$/, module: projects },
   { pattern: /^projects\/(?<slug>[a-z0-9][a-z0-9-]*)$/i, module: project },
   { pattern: /^projects\/(?<slug>[a-z0-9][a-z0-9-]*)\/run$/i, module: runs },

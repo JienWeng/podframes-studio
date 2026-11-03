@@ -35,6 +35,7 @@ export const DEFAULT_OPTIONS: PipelineOptions = {
   showIntro: false,
   showBroll: true,
   generateBrollImages: true,
+  brollSource: "images",
   showGraphics: true,
   maxCues: 10,
   renderQuality: "high",
@@ -71,6 +72,7 @@ export const DEFAULT_HOSTS: [Host, Host] = [
 ];
 
 export interface ResolvedEnv {
+  pexelsApiKey?: string;
   heygenApiKey?: string;
   /** fal.ai key (used for LTX audio-to-video). */
   falApiKey?: string;
@@ -96,6 +98,7 @@ export function ensureEnvLoaded(cwd = process.cwd()): void {
 export function resolveEnv(cwd = process.cwd()): ResolvedEnv {
   ensureEnvLoaded(cwd);
   return {
+    pexelsApiKey: process.env.PEXELS_API_KEY,
     heygenApiKey: process.env.HEYGEN_API_KEY,
     falApiKey: process.env.FAL_API_KEY || process.env.FAL_KEY,
     replicateApiKey: process.env.REPLICATE_API_KEY || process.env.REPLICATE_API_TOKEN,

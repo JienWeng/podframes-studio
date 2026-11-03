@@ -6,6 +6,7 @@ import { animatedTextSvg, TEXT_TEMPLATES, VISUAL_TREATMENTS } from "@podframes/c
 import { useDraft } from "@/components/studio/useDraft";
 import { useTransport } from "@/components/studio/transport";
 import { getProject, regenCueImage, uploadCuePhoto, mediaUrl, type Cue } from "@/components/studio/api";
+import { PexelsPicker } from "./PexelsPicker";
 import { useWizard } from "./context";
 import { StepHeader, StepFooter, inputClass } from "./ui";
 
@@ -153,6 +154,19 @@ export function Step3Look() {
     } finally {
       setRegenId(null);
     }
+  }
+
+  async function attachPexels(cue: Cue, id: number) {
+    if (!ctx.slug) throw new Error("Open a project first.");
+    setRegenId(cue.id);
+    try {
+      if (!(await ctx.patch({ cues }))) throw new Error("Save the cue edits before importing footage.");
+      const response = await fetch(`/api/projects/${encodeURIComponent(ctx.slug)}/broll/${encodeURIComponent(cue.id)}/pexels`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }),
+      });
+      if (!response.ok) throw new Error(await response.text());
+      await ctx.refresh();
+    } finally { setRegenId(null); }
   }
 
   async function generateVideo(cue: Cue) {
@@ -325,7 +339,14 @@ export function Step3Look() {
         })}
       </div>
 
-      {options?.showBroll !== false && <label className="mt-4 flex items-center gap-2 text-sm"><input type="checkbox" checked={options?.generateBrollImages !== false} disabled={disabled} onChange={(event) => void setOption({ generateBrollImages: event.target.checked })} />Generate AI B-roll images when suggesting beats</label>}
+      <label className="mt-4 block text-sm">B-roll source for new beats
+        <select value={options?.brollSource ?? "images"} disabled={disabled} className={inputClass} onChange={(event) => void setOption({ brollSource: event.target.value, showBroll: true })}>
+          <option value="images">Codex images</option>
+          <option value="pexels">Pexels stock videos</option>
+        </select>
+      </label>
+      {options?.brollSource === "pexels" && <p className="mt-2 text-xs text-[var(--color-text-secondary)]">Suggest beats searches and imports footage automatically. New episodes and automation inherit this choice. <a href="https://www.pexels.com" target="_blank" rel="noreferrer" className="underline">Videos provided by Pexels ↗</a></p>}
+      {options?.brollSource !== "pexels" && options?.showBroll !== false && <label className="mt-4 flex items-center gap-2 text-sm"><input type="checkbox" checked={options?.generateBrollImages !== false} disabled={disabled} onChange={(event) => void setOption({ generateBrollImages: event.target.checked })} />Generate AI B-roll images when suggesting beats</label>}
       {options?.showBroll === false && <p className="mt-4 text-xs text-[var(--color-text-muted)]">B-roll is hidden in this export. Enable its toggle to use these beats.</p>}
       {/* B-roll */}
       <div className="mono mb-2 mt-6 flex items-center justify-between text-[10px] tracking-[0.08em] text-[var(--color-text-muted)]">
@@ -490,6 +511,8 @@ export function Step3Look() {
                     </button>
                   </div>
                 )}
+                {cue.type === "broll" && <PexelsPicker query={cue.stockQuery ?? cue.title ?? ""} aspectRatio={project?.config.aspectRatio ?? "16:9"} disabled={disabled || regenId !== null} onUse={(id) => attachPexels(cue, id)} />}
+                {cue.pexels && <a href={cue.pexels.url} target="_blank" rel="noreferrer" className="block text-xs text-[var(--color-text-secondary)] underline">Footage by {cue.pexels.author} on Pexels ↗</a>}
                 {cue.type === "broll" && (
                   <div className="flex gap-2">
                     <textarea value={cue.imagePrompt ?? ""} disabled={disabled} onChange={(e) => setCues((c) => c.map((x, j) => (j === i ? { ...x, imagePrompt: e.target.value } : x)))} rows={2} maxLength={2000} placeholder="Describe the image or video" aria-label="AI image or video prompt" className={`${inputClass} resize-none`} />

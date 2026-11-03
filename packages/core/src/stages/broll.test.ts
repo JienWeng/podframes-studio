@@ -61,3 +61,32 @@ test("b-roll pans throughout the cue, alternates direction, and scrubs determini
   }
   assert.equal(brollMotion(0).to.xPercent, -brollMotion(1).to.xPercent);
 });
+
+
+test("Pexels automation validates its key, omits empty searches, and preserves saved footage", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "podframes-stock-test-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const project = await Project.create({ topic: "Stock video", hosts: structuredClone(DEFAULT_HOSTS), options: { brollSource: "pexels", generateBrollImages: false } }, root, "stock-test");
+  project.state.script = { topic: "Stock video", title: "Stock video", hook: "", turns: [] };
+  project.state.speech = { audioPath: "audio.mp3", durationSec: 6, mediaType: "audio/mpeg", words: [], turns: [] };
+  project.state.broll = { cues: [{ id: "stock", type: "broll", start: 1, end: 4, stockQuery: "office worker" }] };
+  const ctx: StageContext = { project, codex: {} as StageContext["codex"], env: {}, reporter: new Reporter({ console: false }) };
+  await assert.rejects(runBroll(ctx), /PEXELS_API_KEY/);
+  ctx.env.pexelsApiKey = "test-key";
+  let requests = 0;
+  t.mock.method(globalThis, "fetch", async (url: URL) => {
+    requests++;
+    assert.equal(url.searchParams.get("query"), "office worker");
+    return Response.json({ page: 1, total_results: 0, videos: [] });
+  });
+  await runBroll(ctx);
+  assert.equal(requests, 1);
+  assert.deepEqual(project.state.broll.cues, []);
+  delete project.state.stages.broll;
+  await mkdir(project.abs("broll"), { recursive: true });
+  await writeFile(project.abs("broll/saved.mp4"), "saved footage fixture");
+  project.state.broll = { cues: [{ id: "stock", type: "broll", start: 1, end: 4, videoPath: "broll/saved.mp4", stockQuery: "office worker" }] };
+  await runBroll(ctx);
+  assert.equal(requests, 1);
+  assert.equal(project.state.broll.cues[0]!.videoPath, "broll/saved.mp4");
+});

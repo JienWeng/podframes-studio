@@ -57,6 +57,7 @@ OPTIONS
   --provider <p>       Video backend: replicate-p-video (default) | fal-ltx | heygen
   --heygen-auth <mode> subscription (default) | api
   --treatment <t>      minimal (default) | editorial | cinematic
+  --broll-source <s>  images (default) | pexels (requires PEXELS_API_KEY)
   --captions <s>       clean | karaoke | highlight | neon | slam | bold | gradient | boxed
   --resolution <r>     720p (default) | 1080p
   --draft              Fast, lower-quality render (good for iterating)
@@ -91,6 +92,7 @@ async function doctor(root: string): Promise<void> {
   const [ffmpeg, ffprobe] = await Promise.all([has("ffmpeg"), has("ffprobe")]);
   const env = resolveEnv(root);
   const keys: Array<[string, boolean, string]> = [
+    ["Pexels", !!env.pexelsApiKey, "optional stock-video B-roll"],
     ["Fish website login", await fishStatus(), "speech uses website credits (required)"],
     ["Local Whisper", await whisperStatus(), "word timestamps without API billing (required)"],
     ["Codex ChatGPT login", await codexStatus(), "scripts and subscription image generation (required)"],
@@ -162,6 +164,7 @@ async function main(): Promise<void> {
       "heygen-auth": { type: "string" },
       expressiveness: { type: "string" },
       treatment: { type: "string" },
+      "broll-source": { type: "string" },
       captions: { type: "string" },
       resolution: { type: "string" },
       draft: { type: "boolean" },
@@ -221,6 +224,7 @@ async function main(): Promise<void> {
         ...(values.provider ? { videoProvider: values.provider as VideoProviderId } : {}),
         ...(values["heygen-auth"] ? { heygenAuth: values["heygen-auth"] as "subscription" | "api" } : {}),
         ...(values.expressiveness ? { heygenExpressiveness: values.expressiveness as "low" | "medium" | "high" } : {}),
+        ...(values["broll-source"] ? { brollSource: values["broll-source"] as "images" | "pexels", showBroll: true } : {}),
         ...(values.treatment ? { visualTreatment: values.treatment as VisualTreatment } : {}),
         ...(values.captions ? { captionStyle: values.captions as CaptionStyle } : {}),
         ...(values.resolution ? { videoResolution: values.resolution === "1080p" ? "1080p" : "720p" } : {}),

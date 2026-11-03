@@ -12,6 +12,8 @@ export type { GenerateOptions } from "./pipeline";
 export { Project } from "./project";
 export { slugify, slugForTopic, contentHash } from "./util/fs";
 export { pollBrollVideo } from "./clients/broll-video";
+export { searchPexelsVideos, getPexelsVideo } from "./clients/pexels";
+export type { PexelsVideo } from "./clients/pexels";
 export { validateConfig, validateOptions } from "./validate";
 export {
   DEFAULT_OPTIONS,
@@ -103,3 +105,6 @@ export type { AutomationJob, AutomationEvent } from "./automation";
 export { durableRead, durableUpdate } from "./util/durable";
 
 export { run as runProcess } from "./util/proc";
+
+export { downloadFootage, isPublicIPv4, validateFootageBytes } from "./clients/footage-download";
+export { importFootageFile } from "./clients/footage";

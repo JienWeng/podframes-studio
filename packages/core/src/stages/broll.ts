@@ -1,3 +1,6 @@
+import { searchPexelsVideos, getPexelsVideo } from "../clients/pexels";
+import { downloadFootage } from "../clients/footage-download";
+import { importFootageFile } from "../clients/footage";
 import { Type } from "../clients/codex";
 import { visualTreatmentPreset, languageLabel } from "../shared";
 import { contentHash, fileExists } from "../util/fs";
@@ -12,6 +15,7 @@ interface RawCue {
   subtitle?: string;
   figure?: string;
   imagePrompt?: string;
+  stockQuery?: string;
   turnIndex?: number;
   reuseImageId?: string;
 }
@@ -31,11 +35,12 @@ const cueSchema = (types: CueType[]) => ({
         type: Type.STRING,
         description: "for type=broll: a vivid image description (NO text in the image)",
       },
+      stockQuery: { type: Type.STRING, description: "For Pexels footage: 2–6 English search words describing a literal subject and action" },
       turnIndex: { type: Type.NUMBER, description: "which turn this supports" },
       reuseImageId: { type: Type.STRING, description: "Optional exact image-library ID to reuse instead of generating a new image" },
     },
     required: ["start", "end", "type"],
-    propertyOrdering: ["start", "end", "type", "title", "subtitle", "figure", "imagePrompt", "turnIndex", "reuseImageId"],
+    propertyOrdering: ["start", "end", "type", "title", "subtitle", "figure", "imagePrompt", "stockQuery", "turnIndex", "reuseImageId"],
   },
 });
 
@@ -63,7 +68,7 @@ export function brollImageGeometry(
 }
 
 export async function runBroll(ctx: StageContext): Promise<void> {
-  const { project, codex, reporter, signal } = ctx;
+  const { project, codex, reporter, signal, env } = ctx;
   const log = reporter.stage("broll");
   const { config, options, speech, script } = project.state;
 
@@ -116,6 +121,7 @@ export async function runBroll(ctx: StageContext): Promise<void> {
       `Write on-screen titles, quotes, and labels in ${languageLabel(config.language ?? "en")}. Image descriptions may be in English.`,
       `Return at most ${budget} cues (${treatment.densityLabel}), non-overlapping, each 2.5–5s, spread across the episode.`,
       "Prefer stat cards for exact numbers or comparisons, and b-roll only when a concrete visual helps explain the spoken point. Never illustrate a joke literally. Fewer strong cues are better than filler; the cue count is a ceiling, not a target.",
+      ...(options.brollSource === "pexels" ? ["B-roll uses real stock VIDEO from Pexels. For every broll cue, supply stockQuery with 2–6 simple English keywords describing the literal subject and action. Favor concrete everyday footage that can actually be found. Omit reuseImageId. Stock footage is illustrative and cannot establish the actual people or event in a news story."] : []),
       "For each b-roll imagePrompt, art-direct one specific shot: subject, action, environment, camera framing, light, and restrained natural colors. Vary wide establishing views and close details across the episode while keeping a coherent documentary photographic style. Compose for a small screen with one clear focal point and uncluttered edges.",
       "Think like a documentary editor: favor ordinary lived-in spaces, work in progress, practical details, and anonymous people doing relevant everyday tasks. Use candid off-center framing and available light. Avoid staged stock-photo poses, pristine futuristic spaces, dramatic hero lighting, exaggerated depth of field, and visual puns. Do not force a person into every shot.",
       "Avoid stock metaphors: hooded hackers, glowing code, floating coins, padlocks, handshakes, robots, and generic neon technology scenes. For an abstract claim, use a stat or lower-third instead of inventing a picture.",
@@ -156,7 +162,7 @@ export async function runBroll(ctx: StageContext): Promise<void> {
         const hostId = c.turnIndex != null ? hostByTurn.get(c.turnIndex) : undefined;
         const savedImage = c.type === "broll" && c.reuseImageId ? project.state.brollLibrary?.find((image) => image.id === c.reuseImageId) : undefined;
         if (c.type === "broll" && c.reuseImageId && !savedImage) throw new Error(`Unknown reusable image: ${c.reuseImageId}`);
-        if (c.type === "broll" && !savedImage && !c.imagePrompt?.trim()) throw new Error("B-roll image needs a prompt or a known library image.");
+        if (c.type === "broll" && !savedImage && !c.imagePrompt?.trim() && !(options.brollSource === "pexels" && c.stockQuery?.trim())) throw new Error("B-roll image needs a prompt or a known library image.");
         out.push({
           id: `cue-${i}`,
           start,
@@ -165,6 +171,7 @@ export async function runBroll(ctx: StageContext): Promise<void> {
           ...(c.title ? { title: c.title.trim() } : {}),
           ...(c.subtitle ? { subtitle: c.subtitle.trim() } : {}),
           ...(c.figure ? { figure: c.figure.trim() } : {}),
+          ...(c.stockQuery ? { stockQuery: c.stockQuery.trim().slice(0, 200) } : {}),
           ...(c.imagePrompt ? { imagePrompt: c.imagePrompt.trim() } : {}),
           ...(hostId ? { hostId } : {}),
           ...(savedImage ? { imagePath: savedImage.imagePath } : {}),
@@ -179,12 +186,48 @@ export async function runBroll(ctx: StageContext): Promise<void> {
     log.info(`reusing planned cue list (${cleaned.length} cues) from a previous run`);
   }
 
+  if (options.showBroll !== false && options.brollSource === "pexels") {
+    if (!env.pexelsApiKey) throw new Error("Set PEXELS_API_KEY in .env for stock-video B-roll.");
+    const usedIds = new Set(cleaned.flatMap((cue) => cue.pexels ? [cue.pexels.id] : []));
+    const omitted = new Set<string>();
+    for (const cue of cleaned.filter((item) => item.type === "broll")) {
+      if (signal?.aborted) throw new Error("run cancelled");
+      if (cue.videoPath || cue.imagePath) {
+        const path = cue.videoPath ?? cue.imagePath!;
+        if (!fileExists(project.abs(path))) throw new Error(`Saved B-roll media for ${cue.id} is missing. Replace the footage before resuming.`);
+        continue;
+      }
+      const query = (cue.stockQuery || cue.imagePrompt || cue.title || "").trim().slice(0, 200);
+      if (!query) throw new Error(`Add a stock search query for ${cue.id}.`);
+      cue.stockQuery = query;
+      const aspectRatio = config.aspectRatio ?? "16:9";
+      const video = cue.pexels
+        ? await getPexelsVideo({ apiKey: env.pexelsApiKey, id: cue.pexels.id, aspectRatio })
+        : (await searchPexelsVideos({ apiKey: env.pexelsApiKey, query, aspectRatio })).videos.find((item) => !usedIds.has(item.id) && item.duration >= cue.end - cue.start);
+      if (!video) {
+        log.warn(`No matching Pexels footage for “${query}”; leaving this moment on the host.`);
+        omitted.add(cue.id);
+        continue;
+      }
+      cue.pexels = { id: video.id, url: video.url, author: video.author, authorUrl: video.authorUrl };
+      usedIds.add(video.id);
+      await project.save();
+      log.info(`Importing footage by ${video.author} on Pexels`, { cueId: cue.id, sourceUrl: video.url });
+      const imported = await importFootageFile({ project, bytes: await downloadFootage(video.videoUrl), signal });
+      cue.videoPath = imported.videoPath;
+      cue.sourceUrl = video.url;
+      cue.end = Math.min(cue.end, cue.start + imported.duration);
+      await project.save();
+    }
+    cleaned = cleaned.filter((cue) => !omitted.has(cue.id));
+  }
+
   // Generate b-roll images (only for type=broll). Minimal/editorial use the fixed
   // square compose card (see compose/builder.ts .broll-card) so a square source
   // needs no cropping; cinematic's full-frame takeovers get canvas-aspect 2K
   // sources instead (see brollImageGeometry).
   const geometry = brollImageGeometry(options.visualTreatment, config.aspectRatio);
-  const brollCues = cleaned.filter((c) => options.showBroll !== false && options.generateBrollImages !== false && c.type === "broll" && (c.imagePrompt || c.imagePath));
+  const brollCues = cleaned.filter((c) => options.showBroll !== false && options.brollSource !== "pexels" && options.generateBrollImages !== false && c.type === "broll" && (c.imagePrompt || c.imagePath));
   if (brollCues.length)
     log.info(`generating ${brollCues.length} b-roll images with ${options.brollImageModel}`);
 

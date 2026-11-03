@@ -128,6 +128,8 @@ export interface PipelineOptions {
   showIntro: boolean;
   showBroll: boolean;
   generateBrollImages: boolean;
+  /** Source used to fill newly planned B-roll beats. */
+  brollSource?: "images" | "pexels";
   showGraphics: boolean;
   /** Hard ceiling on b-roll/overlay cues (the effective budget depends on visualTreatment). */
   maxCues: number;
@@ -265,6 +267,8 @@ export interface Cue {
   imagePath?: string;
   videoPath?: string;
   sourceUrl?: string;
+  stockQuery?: string;
+  pexels?: { id: number; url: string; author: string; authorUrl: string };
   /** Which host this cue supports, for color + attribution. */
   hostId?: string;
 }

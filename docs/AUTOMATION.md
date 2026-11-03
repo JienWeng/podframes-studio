@@ -201,3 +201,29 @@ External tools can use the token-protected `/api/v1/` endpoints to create series
 Start `pnpm worker` in a separate terminal before using Studio or the HTTP automation API. Keep it running while jobs are queued. Full pipeline jobs and progress persist in `.automation/state.sqlite`, independently of the web-server lifetime. The CLI generation command still runs directly. Authentication, request keys, operation limits, and interrupted-job recovery are documented in [API.md](API.md).
 
 For stronger HeyGen facial reactions and gestures, add `--expressiveness high` to the direct CLI command. Supported levels are `low`, `medium`, and `high`. Fish vocal delivery still follows the supplied inline speech directions. Changing expressiveness invalidates existing talking clips and requires fresh video generation.
+
+## Pexels video B-roll in the studio and automation
+
+Add `PEXELS_API_KEY=your_key` to the repository `.env` on the machine running the studio and worker. Restart both after saving the key. The key stays on the server.
+
+In **B-roll & captions**, add a footage beat and open **Search Pexels videos**. Search using a concrete subject and action, preview a clip, then choose **Use this footage**. This enables B-roll, downloads a muted local copy and keeps the creator/source credit with the cue. Existing timing is kept, capped to the clip length. Search results link to Pexels and the creator's footage page.
+
+For automatic selection, set **B-roll source for new beats → Pexels stock videos** in the show template. Future episodes inherit it. **Suggest beats** plans timestamped queries and imports a matching video for each footage beat. Existing selected media stays in place until you replace it or re-suggest the plan. The worker prefers the episode orientation, a suitable duration, and a different clip for each beat. Review the selected footage for relevance. A search with no suitable result leaves that moment on the host and logs the omission. API errors stop the stage so it can resume using its saved selections.
+
+Run the existing automation helper with an explicit source override:
+
+```sh
+node scripts/generate-podcast.mjs --topic "AI 做五个人的工，薪水 leh？" ai-work-stock --duration 30 --broll-source pexels
+```
+
+For an external dialogue file:
+
+```sh
+node scripts/generate-podcast.mjs episode.md episode-with-footage --broll-source pexels
+```
+
+The direct CLI also accepts `--broll-source pexels`. API/worker configurations use `config.options.brollSource = "pexels"` with `showBroll = true`. The same B-roll stage searches, imports, saves attribution and resumes in each workflow.
+
+External automation can search `GET /api/v1/stock/pexels?query=office%20worker&aspect=9:16&page=1`, then apply a result with `POST /api/v1/projects/<slug>/broll/<cueId>/pexels` and JSON `{ "id": 12345 }`. Use the normal Podframes Bearer token and an idempotency key for writes. The server looks up the chosen ID again before downloading, so clients never supply arbitrary provider URLs or the Pexels credential.
+
+[Videos provided by Pexels](https://www.pexels.com). [Official API documentation](https://www.pexels.com/api/documentation/).

@@ -49,6 +49,7 @@ export async function POST(
       await writeFile(project.abs(rel), bytes);
       cue.imagePath = rel;
       delete cue.videoPath;
+      delete cue.pexels;
       delete cue.sourceUrl;
       await clearStages(project, ["compose", "render"]);
       await project.save();
@@ -78,6 +79,7 @@ export async function POST(
     });
     cue.imagePath = rel;
     delete cue.videoPath;
+    delete cue.pexels;
     delete cue.sourceUrl;
     if (prior && prior !== rel && prior.startsWith("broll/") && !prior.startsWith("broll/upload-")) await rm(project.abs(prior), { force: true });
 

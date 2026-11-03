@@ -9,7 +9,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const template = "what-makes-a-good-cold-open-episode"; // Approved Jason/May template.
 
 async function main() {
-  const { values, positionals } = parseArgs({ options: { topic: { type: "string" }, duration: { type: "string" }, check: { type: "boolean" } }, allowPositionals: true });
+  const { values, positionals } = parseArgs({ options: { topic: { type: "string" }, duration: { type: "string" }, check: { type: "boolean" }, "broll-source": { type: "string" } }, allowPositionals: true });
   const topicMode = values.topic !== undefined;
   if (positionals.length !== (topicMode ? 1 : 2)) throw new Error("Usage: node scripts/generate-podcast.mjs <episode.md|episode.txt> <episode-slug> [--check]\nOr: node scripts/generate-podcast.mjs --topic <topic> <episode-slug> [--duration <seconds>] [--check]");
   const slug = positionals[topicMode ? 0 : 1];
@@ -30,6 +30,10 @@ async function main() {
     const script = resolve(process.cwd(), input);
     await access(script);
     command.push("--script", script);
+  }
+  if (values["broll-source"]) {
+    if (!["images", "pexels"].includes(values["broll-source"])) throw new Error("B-roll source must be images or pexels.");
+    command.push("--broll-source", values["broll-source"]);
   }
   if (values.check) command.push("--only", "script");
   const child = spawn("pnpm", command, { cwd: root, stdio: "inherit", env: { ...process.env, INIT_CWD: root } });

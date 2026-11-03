@@ -88,6 +88,7 @@ export function validateOptions(options: Partial<PipelineOptions>, fail?: (msg: 
       raise(`${name} must be ${min}–${max} (got ${String(value)})`);
     }
   };
+  oneOf("brollSource", o.brollSource, ["images", "pexels"] as const);
   oneOf("videoProvider", o.videoProvider, VIDEO_PROVIDERS.map((p) => p.id));
   oneOf("heygenAuth", o.heygenAuth, ["subscription", "api"] as const);
   oneOf("heygenExpressiveness", o.heygenExpressiveness, ["low", "medium", "high"] as const);
