@@ -199,3 +199,5 @@ External tools can use the token-protected `/api/v1/` endpoints to create series
 ## Worker process
 
 Start `pnpm worker` in a separate terminal before using Studio or the HTTP automation API. Keep it running while jobs are queued. Full pipeline jobs and progress persist in `.automation/state.sqlite`, independently of the web-server lifetime. The CLI generation command still runs directly. Authentication, request keys, operation limits, and interrupted-job recovery are documented in [API.md](API.md).
+
+For stronger HeyGen facial reactions and gestures, add `--expressiveness high` to the direct CLI command. Supported levels are `low`, `medium`, and `high`. Fish vocal delivery still follows the supplied inline speech directions. Changing expressiveness invalidates existing talking clips and requires fresh video generation.

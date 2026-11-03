@@ -77,6 +77,18 @@ test("subscription uses OAuth, uploads real media, creates and downloads a video
   assert.equal(process.env.HEYGEN_API_KEY, "inherited-api-secret");
 });
 
+test("high expressiveness reaches HeyGen and changes the saved generation identity", async (t) => {
+  const { args, calls } = await fixture(t);
+  await audioToVideo(args);
+  await audioToVideo({ ...args, expressiveness: "high" });
+  const creates = (await calls()).filter((call) => call.args[0] === "video" && call.args[1] === "create");
+  assert.equal(creates.length, 2);
+  assert.equal(JSON.parse(creates[0].input).expressiveness, "low");
+  assert.equal(JSON.parse(creates[1].input).expressiveness, "high");
+  await audioToVideo({ ...args, expressiveness: "high" });
+  assert.equal((await calls()).filter((call) => call.args[0] === "video" && call.args[1] === "create").length, 2);
+});
+
 test("API billing requires explicit key and rejects OAuth fallback", async (t) => {
   await fixture(t);
   await assert.rejects(assertHeygenAuth("api"), /HEYGEN_API_KEY is required/);

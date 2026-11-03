@@ -224,6 +224,7 @@ const OPTION_INVALIDATION = {
   captionColor: "captions",
   visualTreatment: "visualTreatment",
   videoProvider: "videoProvider",
+  heygenExpressiveness: "videoProvider",
   videoResolution: "videoResolution",
 } as const satisfies Partial<Record<keyof PipelineOptions, keyof typeof INVALIDATION>>;
 

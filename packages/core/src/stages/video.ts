@@ -37,7 +37,11 @@ export async function runVideo(ctx: StageContext): Promise<void> {
 // This is a PODCAST: the input image already defines identity, pose, setting,
 // and framing. Keep this prompt deliberately small so the animator doesn't get
 // invited to invent camera motion or a performance.
-function talkingHeadPrompt(h: Host): string {
+function talkingHeadPrompt(h: Host, expressiveness = "low", dialogue = ""): string {
+  if (expressiveness !== "low") {
+    const cues = dialogue.match(/\[[^\]]+\]/g)?.join(" ") ?? "";
+    return `${h.name} is the avatar in the input image. Accurate lip-sync with ${expressiveness === "high" ? "highly expressive" : "moderately expressive"} facial reactions, eyebrow movement, head movement and conversational hand gestures matching the audio. Follow these acting cues: ${cues}. Keep a steady camera, the same identity, clothing, framing and background.`;
+  }
   return (
     `${h.name} is the avatar in the input image. The avatar talks to camera with accurate lip-sync. ` +
     "Keep the input image framing, pose, and background unchanged except for natural mouth movement."
@@ -171,7 +175,7 @@ async function runPerTurnVideo(ctx: StageContext, provider: PerTurnProvider, ani
           animate({
             imagePath: baseAvatar.get(h.id)!,
             audioPath: project.abs(seg.audioPath),
-            prompt: talkingHeadPrompt(h),
+            prompt: talkingHeadPrompt(h, provider === "heygen" ? options.heygenExpressiveness : "low", region.text),
             seed: 1000 + region.turnIndex * 10 + segIndex,
             outputPath: clipPath,
           }),
@@ -319,6 +323,7 @@ async function runVideoHeygen(ctx: StageContext): Promise<void> {
   await runPerTurnVideo(ctx, "heygen", async ({ imagePath, audioPath, prompt, outputPath }) => {
     await audioToVideoHeygen({
       auth: options.heygenAuth ?? "subscription",
+      expressiveness: options.heygenExpressiveness,
       apiKey: ctx.env.heygenApiKey,
       imagePath, audioPath, prompt, outputPath,
       aspectRatio: config.aspectRatio ?? "16:9",

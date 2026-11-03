@@ -11,6 +11,7 @@ export interface HeygenVideoArgs {
   apiKey?: string;
   aspectRatio?: "16:9" | "9:16";
   resolution?: "720p" | "1080p";
+  expressiveness?: "low" | "medium" | "high";
   imagePath: string;
   audioPath: string;
   prompt: string;
@@ -90,11 +91,13 @@ export async function audioToVideo(args: HeygenVideoArgs): Promise<{ path: strin
   await assertHeygenAuth(args.auth, args.apiKey);
   const aspectRatio = args.aspectRatio ?? "16:9";
   const resolution = args.resolution ?? "720p";
+  const expressiveness = args.expressiveness ?? "low";
+  if (!["low", "medium", "high"].includes(expressiveness)) throw new Error("Unsupported HeyGen expressiveness");
   if (!["16:9", "9:16"].includes(aspectRatio) || !["720p", "1080p"].includes(resolution)) throw new Error("Unsupported HeyGen aspect ratio or resolution");
   const [image, audio] = await Promise.all([readFile(args.imagePath), readFile(args.audioPath)]);
   if (!image.length || !audio.length) throw new Error("HeyGen image and audio must not be empty");
   const key = createHash("sha256").update(`${image.length}:`).update(image).update(audio)
-    .update(JSON.stringify([args.prompt, aspectRatio, resolution, args.auth])).digest("hex");
+    .update(JSON.stringify([args.prompt, aspectRatio, resolution, args.auth, ...(expressiveness === "low" ? [] : [expressiveness])])).digest("hex");
   const sidecar = `${args.outputPath}.heygen.json`;
   let pending = await readJson<PendingVideo>(sidecar).catch((error: NodeJS.ErrnoException) => {
     if (error.code === "ENOENT") return undefined;
@@ -124,7 +127,7 @@ export async function audioToVideo(args: HeygenVideoArgs): Promise<{ path: strin
       aspect_ratio: aspectRatio,
       resolution,
       motion_prompt: args.prompt,
-      expressiveness: "low",
+      expressiveness,
     })));
     pending.videoId = identifier(response.video_id, "video_id");
     await writeJson(sidecar, pending);

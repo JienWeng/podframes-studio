@@ -87,6 +87,7 @@ export function validateOptions(options: Partial<PipelineOptions>, fail?: (msg: 
   };
   oneOf("videoProvider", o.videoProvider, VIDEO_PROVIDERS.map((p) => p.id));
   oneOf("heygenAuth", o.heygenAuth, ["subscription", "api"] as const);
+  oneOf("heygenExpressiveness", o.heygenExpressiveness, ["low", "medium", "high"] as const);
   oneOf("videoResolution", o.videoResolution, ["720p", "1080p"] as const);
   oneOf("renderQuality", o.renderQuality, ["draft", "standard", "high"] as const);
   oneOf("fps", o.fps, [24, 30] as const);

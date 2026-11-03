@@ -104,6 +104,7 @@ export interface PipelineOptions {
   videoProvider: "fal-ltx" | "replicate-p-video" | "heygen";
   /** Explicit billing source for HeyGen CLI. */
   heygenAuth: "subscription" | "api";
+  heygenExpressiveness?: "low" | "medium" | "high";
   /** Writing route: codex-local, claude-code/model, openai/model, or anthropic/model. */
   scriptModel: string;
   /** Writing route for supporting-visual planning. */

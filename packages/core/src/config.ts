@@ -22,6 +22,7 @@ export const MODELS = {
 export const DEFAULT_OPTIONS: PipelineOptions = {
   videoProvider: "replicate-p-video",
   heygenAuth: "subscription",
+  heygenExpressiveness: "low",
   scriptModel: MODELS.scriptModel,
   cueModel: MODELS.cueModel,
   imageModel: MODELS.imageModel,

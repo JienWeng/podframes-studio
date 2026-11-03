@@ -51,6 +51,7 @@ OPTIONS
   --host-a "<name|model|voice>"   e.g. "Ada|fish/drama-3|<reference-id>"
   --host-b "<name|model|voice>"   e.g. "Theo|fish/drama-3|<reference-id>"
 
+  --expressiveness <level> HeyGen motion level: low, medium, high
   --writer <provider/model> Writing model, e.g. claude-code/sonnet or openai/<model>
   --cue-writer <provider/model> Optional separate supporting-visual planner
   --provider <p>       Video backend: replicate-p-video (default) | fal-ltx | heygen
@@ -159,6 +160,7 @@ async function main(): Promise<void> {
       writer: { type: "string" },
       "cue-writer": { type: "string" },
       "heygen-auth": { type: "string" },
+      expressiveness: { type: "string" },
       treatment: { type: "string" },
       captions: { type: "string" },
       resolution: { type: "string" },
@@ -218,6 +220,7 @@ async function main(): Promise<void> {
         ...(values["cue-writer"] ? { cueModel: values["cue-writer"] } : {}),
         ...(values.provider ? { videoProvider: values.provider as VideoProviderId } : {}),
         ...(values["heygen-auth"] ? { heygenAuth: values["heygen-auth"] as "subscription" | "api" } : {}),
+        ...(values.expressiveness ? { heygenExpressiveness: values.expressiveness as "low" | "medium" | "high" } : {}),
         ...(values.treatment ? { visualTreatment: values.treatment as VisualTreatment } : {}),
         ...(values.captions ? { captionStyle: values.captions as CaptionStyle } : {}),
         ...(values.resolution ? { videoResolution: values.resolution === "1080p" ? "1080p" : "720p" } : {}),
