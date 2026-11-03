@@ -17,7 +17,7 @@ out/
 projects/*
 !projects/.gitkeep
 runs/
-library/
+/library/
 
 # locally-fetched agent skills (pinned in skills-lock.json)
 .agents/
