@@ -32,7 +32,7 @@ export async function POST(
 
     const cue = s.broll?.cues.find((c) => c.id === cueId);
     if (!cue) return new Response("cue not found", { status: 404 });
-    if (cue.type !== "broll") return new Response("cue is not a b-roll cue", { status: 400 });
+    if (cue.type !== "broll" && !cue.textTemplate) return new Response("Choose a b-roll or animated-text cue.", { status: 400 });
 
     if (req.headers.get("content-type")?.includes("multipart/form-data")) {
       const form = await req.formData();
@@ -55,6 +55,8 @@ export async function POST(
       await project.save();
       return Response.json({ ...projectSummary(s), cue, imageUrl: `/api/media/${safe}/${rel}` });
     }
+
+    if (cue.type !== "broll") return new Response("Upload a sticker image for animated text.", { status: 400 });
 
     const body = (await req.json().catch(() => ({}))) as { imagePrompt?: string };
     if (typeof body.imagePrompt === "string" && body.imagePrompt.trim()) cue.imagePrompt = body.imagePrompt.trim();

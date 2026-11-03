@@ -1,0 +1,33 @@
+import assert from "node:assert/strict";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { test } from "node:test";
+import { DEFAULT_HOSTS, Project } from "@podframes/core";
+import { POST } from "../app/api/projects/[slug]/broll/[cueId]/regenerate/route";
+
+test("animated quote accepts a sticker upload and preserves its editable text and timing", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "podframes-quote-sticker-"));
+  const cwd = process.cwd();
+  t.after(async () => { process.chdir(cwd); await rm(root, { recursive: true, force: true }); });
+  await writeFile(join(root, "pnpm-workspace.yaml"), "packages: []");
+  const project = await Project.create({ topic: "Sticker", hosts: structuredClone(DEFAULT_HOSTS) }, root, "episode");
+  project.state.broll = { cues: [{ id: "quote", type: "quote", textTemplate: "comic", start: 2, end: 4, title: "薪水 leh？" }] };
+  await project.save();
+  process.chdir(root);
+  const params = { params: Promise.resolve({ slug: "episode", cueId: "quote" }) };
+  const bytes = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 0]);
+  const body = new FormData();
+  body.set("file", new File([bytes], "wallet.png", { type: "image/png" }));
+  const response = await POST(new Request("http://localhost/api/projects/episode/broll/quote/regenerate", { method: "POST", body }), params);
+  assert.equal(response.status, 200);
+  const cue = (await Project.load(root, "episode"))!.state.broll!.cues[0]!;
+  assert.equal(cue.title, "薪水 leh？");
+  assert.equal(cue.start, 2);
+  assert.equal(cue.end, 4);
+  assert.equal(cue.textTemplate, "comic");
+  assert.match(cue.imagePath!, /^broll\/upload-.*\.png$/);
+  assert.deepEqual(await readFile(project.abs(cue.imagePath!)), Buffer.from(bytes));
+  const rejected = await POST(new Request("http://localhost/api/projects/episode/broll/quote/regenerate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ imagePrompt: "A sticker" }) }), params);
+  assert.equal(rejected.status, 400);
+});

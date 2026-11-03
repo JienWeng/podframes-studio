@@ -412,7 +412,13 @@ function CueCard({ cue, cueIndex, time, color, slug, updatedAt, treatment }: { c
     const rotation = progress < 1 ? -12 + 9 * bounce : -3 + 5 * Math.min(1, (time - cue.start - entry) / Math.max(0.01, span - entry * 2));
     return <div className="pointer-events-none absolute inset-0 z-[35] flex items-center justify-center">
       {/* Shared SVG escapes editable text before creating markup. */}
-      <div className="w-[82%] drop-shadow-md" style={{ opacity: Math.min(1, (cue.end - time) / (entry / 2)), transformOrigin: "50% 65%", transform: `translateY(${28 * (1 - bounce)}px) scale(${0.2 + 0.8 * bounce}) rotate(${rotation}deg)` }} dangerouslySetInnerHTML={{ __html: animatedTextSvg(cue.textTemplate, cue.title ?? "") }} />
+      <div className="relative w-[82%] drop-shadow-md" style={{ opacity: Math.min(1, (cue.end - time) / (entry / 2)), transformOrigin: "50% 65%", transform: `translateY(${28 * (1 - bounce)}px) scale(${0.2 + 0.8 * bounce}) rotate(${rotation}deg)` }}>
+        {cue.imagePath && slug && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={mediaUrl(slug, cue.imagePath, updatedAt)} alt="" className="absolute -right-[2%] bottom-[65%] h-auto w-[34%] object-contain" style={{ transformOrigin: "50% 80%", transform: `translateY(${3 - 6 * (0.5 - Math.cos(Math.PI * (time - cue.start) / span) / 2)}%) rotate(${-6 + 12 * (0.5 - Math.cos(Math.PI * (time - cue.start) / span) / 2)}deg)` }} />
+        )}
+        <div dangerouslySetInnerHTML={{ __html: animatedTextSvg(cue.textTemplate, cue.title ?? "") }} />
+      </div>
     </div>;
   }
   // Mirrors builder.ts: even cues sit right, odd cues left (editorial only).

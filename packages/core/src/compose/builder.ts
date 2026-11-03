@@ -298,6 +298,7 @@ export function buildComposition(input: BuildInput): string {
         `    tl.to('#${cue.id}', { opacity: 0, duration: ${entry / 2} }, ${r2(end - entry / 2)});`,
         `    tl.set('#${cue.id}', { opacity: 0 }, ${end});`,
       );
+      if (cue.image) tl.push(`    tl.fromTo('#${cue.id} .quote-sticker', { rotation: -6, yPercent: 3 }, { rotation: 6, yPercent: -3, duration: ${dur}, ease: 'sine.inOut' }, ${start});`);
     } else if (cue.type === "broll" && cue.image) {
       tl.push(`    tl.set('#${cue.id}', { opacity: 1 }, ${start});`);
       if (treatment === "cinematic") {
@@ -363,7 +364,7 @@ function cueInner(
   cue: Cue & { image?: string },
   color: string,
 ): string {
-  if (cue.textTemplate) return `<div class="text-sticker">${animatedTextSvg(cue.textTemplate, cue.title ?? "")}</div>`;
+  if (cue.textTemplate) return `<div class="text-sticker">${cue.image ? `<img class="quote-sticker" src="${esc(cue.image)}" alt="" />` : ""}${animatedTextSvg(cue.textTemplate, cue.title ?? "")}</div>`;
   if (cue.type === "broll" && cue.image) {
     // A centered card laid OVER the avatar video, which keeps playing underneath —
     // same tier as the stat/quote/lower-third cards below, not a full-screen takeover.
@@ -443,7 +444,8 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;
    centered card (not full-screen), so it shares the same tier as stat/quote/l3. */
 .cue{z-index:20}
 .overlay.cue.animated-text{z-index:35;display:flex;align-items:center;justify-content:center;padding:0;background:none}
-.text-sticker{width:82%;transform-origin:50% 65%;filter:drop-shadow(0 6px 0 rgba(0,0,0,.22))}.text-sticker svg{width:100%;height:auto;display:block}
+.text-sticker{position:relative;width:82%;transform-origin:50% 65%;filter:drop-shadow(0 6px 0 rgba(0,0,0,.22))}.text-sticker svg{width:100%;height:auto;display:block}
+.quote-sticker{position:absolute;right:-2%;bottom:65%;width:34%;height:auto;object-fit:contain;transform-origin:50% 80%}
 .caption{z-index:50}
 .episode-open{z-index:80;background:var(--bg);overflow:hidden}
 

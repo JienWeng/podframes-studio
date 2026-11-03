@@ -10,6 +10,12 @@ import { PexelsPicker } from "./PexelsPicker";
 import { useWizard } from "./context";
 import { StepHeader, StepFooter, inputClass } from "./ui";
 
+const QUOTE_STICKERS = [
+  { id: "overworked", label: "Overworked hamster" },
+  { id: "shocked", label: "Shocked egg" },
+  { id: "empty-wallet", label: "Empty wallet" },
+] as const;
+
 const tc = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, "0")}`;
 
 // Only "broll" cues carry an image — "stat"/"quote"/"lower-third" are text cards laid
@@ -154,6 +160,19 @@ export function Step3Look() {
     } finally {
       setRegenId(null);
     }
+  }
+
+  async function attachSticker(cue: Cue, id: string) {
+    setRegenId(cue.id);
+    setImageError("");
+    try {
+      const response = await fetch(`/stickers/${id}.png`);
+      if (!response.ok) throw new Error("Could not load the sticker asset.");
+      const blob = await response.blob();
+      await upload(cue, new File([blob], `${id}.png`, { type: "image/png" }));
+    } catch (error) {
+      setImageError(error instanceof Error ? error.message : String(error));
+    } finally { setRegenId(null); }
   }
 
   async function attachPexels(cue: Cue, id: number) {
@@ -470,6 +489,27 @@ export function Step3Look() {
                   </select>
                 </label>}
                 <input value={cue.title ?? ""} disabled={disabled} onChange={patchField("title")} onBlur={() => saveCues(cues)} placeholder={cue.type === "quote" ? "quote text" : "label"} className={inputClass} />
+                {cue.textTemplate && <div className="space-y-2">
+                  <div className="grid grid-cols-3 gap-2">
+                    {QUOTE_STICKERS.map((sticker) => <button key={sticker.id} type="button" disabled={disabled || regenId !== null} onClick={() => void attachSticker(cue, sticker.id)} className="rounded-lg border border-[var(--color-control-border)] bg-[var(--color-surface-2)] p-2 text-xs disabled:opacity-50" title={`Add ${sticker.label}`}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={`/stickers/${sticker.id}.png`} alt="" className="mx-auto h-14 w-16 object-contain" />
+                      <span className="mt-1 block">{sticker.label}</span>
+                    </button>)}
+                  </div>
+                  <label className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">{regenId === cue.id ? "Updating sticker…" : "Sticker image"}
+                    <input type="file" accept="image/png,image/jpeg,image/webp" disabled={disabled || regenId !== null} className="min-w-0 flex-1 text-xs" onChange={(event) => {
+                      const file = event.currentTarget.files?.[0];
+                      event.currentTarget.value = "";
+                      if (file) void upload(cue, file);
+                    }} />
+                  </label>
+                  {cue.imagePath && <div className="flex items-center gap-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={mediaUrl(ctx.slug!, cue.imagePath, project?.updatedAt)} alt="Attached sticker" className="h-16 w-16 object-contain" />
+                    <button type="button" disabled={disabled || regenId !== null} className="text-xs underline" onClick={() => void saveCues(cues.map((item, index) => index === i ? { ...item, imagePath: undefined } : item))}>Remove sticker</button>
+                  </div>}
+                </div>}
                 {cue.type !== "broll" && !cue.textTemplate && (
                   <input value={cue.subtitle ?? ""} disabled={disabled} onChange={patchField("subtitle")} onBlur={() => saveCues(cues)} placeholder="subtitle (optional)" className={inputClass} />
                 )}

@@ -100,8 +100,10 @@ test("buildComposition tiles already-trimmed clips on the shortened audio window
   );
   assert.doesNotMatch(html, /id="episode-open"/);
 
-  const sticker = buildComposition({ ...input, cues: [{ id: "sticker", type: "quote", textTemplate: "burst", title: '<script>alert("x")</script>', start: 0.5, end: 2 }] });
+  const sticker = buildComposition({ ...input, cues: [{ id: "sticker", type: "quote", textTemplate: "burst", image: "media/sticker.png", title: '<script>alert("x")</script>', start: 0.5, end: 2 }] });
   assert.match(sticker, /animated-text/);
+  assert.match(sticker, /class="quote-sticker" src="media\/sticker.png"/);
+  assert.match(sticker, /quote-sticker.*sine.inOut/);
   assert.match(sticker, /back.out\(2.2\)/);
   assert.match(sticker, /&lt;script&gt;/);
   assert.doesNotMatch(sticker, /<script>alert/);
