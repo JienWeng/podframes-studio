@@ -351,6 +351,46 @@ test("context changes replan automatic art while manual none and uploaded art pe
   assert.equal(needsQuoteStickerDirection(project), false);
 });
 
+test("sticker-only action mode reaches the planner and invalidates cached automatic choices", async (t) => {
+  const cue = { ...quote("action", "写文案"), textTemplate: "ribbon" as const };
+  const { ctx, project, requests, images, control } = await fixture(
+    t,
+    [cue],
+    [none("action")],
+  );
+  project.state.speech!.turns[0]!.text = "先写文案，再做视频。";
+  await directQuoteStickers(ctx);
+  const regularKey = cue.stickerDirection!.contextKey;
+  assert.equal(cue.stickerDirection!.decision, "none");
+  assert.equal(needsQuoteStickerDirection(project), false);
+  cue.stickerOnly = true;
+  control.directions = [
+    generate("action", "A fountain pen writing on a sheet of paper"),
+  ];
+  assert.equal(needsQuoteStickerDirection(project), true);
+  await directQuoteStickers(ctx);
+  assert.match(requests[1]!.contents, /"stickerOnly":true/);
+  assert.match(requests[1]!.contents, /先写文案，再做视频/);
+  assert.match(requests[1]!.system!, /literal concrete action or object/);
+  assert.match(requests[1]!.system!, /Generic reactions must not stand in for specific actions/);
+  assert.match(requests[1]!.system!, /text-template choice is ignored/);
+  assert.notEqual(cue.stickerDirection!.contextKey, regularKey);
+  assert.equal(cue.textTemplate, "ribbon");
+  assert.equal(images.length, 1);
+  assert.match(images[0]!.prompt, /pen writing on a sheet of paper/);
+  assert.ok(cue.imagePath);
+  const actionKey = cue.stickerDirection!.contextKey;
+  cue.stickerOnly = false;
+  control.directions = [none("action")];
+  assert.equal(needsQuoteStickerDirection(project), true);
+  await directQuoteStickers(ctx);
+  assert.match(requests[2]!.contents, /"stickerOnly":false/);
+  assert.notEqual(cue.stickerDirection!.contextKey, actionKey);
+  assert.equal(cue.stickerDirection!.decision, "none");
+  assert.equal(cue.imagePath, undefined);
+  assert.equal(images.length, 1);
+});
+
 test("unknown IDs and oversized generation prompts fail before image generation", async (t) => {
   const { ctx, project, control, images } = await fixture(
     t,

@@ -6,7 +6,7 @@ interface QuoteRectangle {
 }
 
 /** Canvas percentages for the group, parent-relative percentages for its sibling slots. */
-export function quoteLayout(aspectRatio: "9:16" | "16:9", hasSticker: boolean): {
+export function quoteLayout(aspectRatio: "9:16" | "16:9", hasSticker: boolean, stickerOnly = false): {
   container: QuoteRectangle;
   card: QuoteRectangle;
   sticker: QuoteRectangle | null;
@@ -23,9 +23,9 @@ export function quoteLayout(aspectRatio: "9:16" | "16:9", hasSticker: boolean): 
     width: cardWidth,
     height: cardWidth * frameAspect * 240 / 640,
   };
-  const stickerWidth = portrait ? 18 : 4;
+  const stickerWidth = stickerOnly ? (portrait ? 24 : 4.5) : (portrait ? 18 : 4);
   const sticker = {
-    x: portrait ? 7 : 37,
+    x: stickerOnly ? (portrait ? 8 : 48) : (portrait ? 7 : 37),
     y: portrait ? 64 : 60,
     width: stickerWidth,
     height: stickerWidth * frameAspect,

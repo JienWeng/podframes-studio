@@ -32,7 +32,7 @@ export async function POST(
 
     const cue = s.broll?.cues.find((c) => c.id === cueId);
     if (!cue) return new Response("cue not found", { status: 404 });
-    if (cue.type !== "broll" && !cue.textTemplate) return new Response("Choose a b-roll or animated-text cue.", { status: 400 });
+    if (cue.type !== "broll" && !cue.textTemplate && !cue.stickerOnly) return new Response("Choose a b-roll or animated-text cue.", { status: 400 });
 
     if (req.headers.get("content-type")?.includes("multipart/form-data")) {
       const form = await req.formData();

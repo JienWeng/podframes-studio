@@ -403,19 +403,20 @@ function CueCard({ cue, cueIndex, time, color, slug, updatedAt, treatment, aspec
         Math.min(time - cue.start, video.duration - 0.01),
       );
   }, [time, cue.start, cue.videoPath]);
-  if (cue.textTemplate) {
+  if (cue.textTemplate || cue.stickerOnly) {
+    if (cue.stickerOnly && (!cue.imagePath || !slug)) return null;
     const span = cue.end - cue.start;
     const entry = Math.min(0.42, span / 3);
     const progress = Math.max(0, Math.min(1, (time - cue.start) / entry));
     const x = progress - 1;
     const bounce = 1 + 3.2 * x * x * x + 2.2 * x * x;
     const sway = 0.5 - Math.cos(Math.PI * Math.max(0, Math.min(1, (time - cue.start) / span))) / 2;
-    const { container, card, sticker } = quoteLayout(aspectRatio, !!cue.imagePath && !!slug);
+    const { container, card, sticker } = quoteLayout(aspectRatio, !!cue.imagePath && !!slug, cue.stickerOnly);
     const position = (rectangle: typeof container) => ({ left: `${rectangle.x}%`, top: `${rectangle.y}%`, width: `${rectangle.width}%`, height: `${rectangle.height}%` });
     return <div className="pointer-events-none absolute inset-0 z-[35]">
       {/* Shared SVG escapes editable text before creating markup. */}
       <div className="absolute" style={{ ...position(container), opacity: Math.min(1, (cue.end - time) / (entry / 2)), transformOrigin: "50% 50%", transform: `translateY(${5 * (1 - bounce)}%) scale(${0.86 + 0.14 * bounce})` }}>
-        <div className="absolute [&_svg]:block [&_svg]:h-full [&_svg]:w-full" style={{ ...position(card), filter: "drop-shadow(0 3px 0 rgba(0,0,0,.22))", transform: `rotate(${-2 + 4 * sway}deg)` }} dangerouslySetInnerHTML={{ __html: animatedTextSvg(cue.textTemplate, cue.title ?? "") }} />
+        {!cue.stickerOnly && cue.textTemplate && <div className="absolute [&_svg]:block [&_svg]:h-full [&_svg]:w-full" style={{ ...position(card), filter: "drop-shadow(0 3px 0 rgba(0,0,0,.22))", transform: `rotate(${-2 + 4 * sway}deg)` }} dangerouslySetInnerHTML={{ __html: animatedTextSvg(cue.textTemplate, cue.title ?? "") }} />}
         {cue.imagePath && slug && sticker && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={mediaUrl(slug, cue.imagePath, updatedAt)} alt="" className="absolute object-contain" style={{ ...position(sticker), transformOrigin: "50% 50%", transform: `translateY(${3 - 6 * sway}%) rotate(${-6 + 12 * sway}deg)` }} />

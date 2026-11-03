@@ -257,6 +257,8 @@ export interface Cue {
   type: CueType;
   /** Original animated graphic preset; text stays editable in title. */
   textTemplate?: "burst" | "comic" | "ribbon";
+  /** Illustrative artwork without an on-screen quote card. */
+  stickerOnly?: boolean;
   stickerDirection?: { decision: "existing" | "generate" | "none"; stickerId?: string; prompt?: string; contextKey?: string };
   /** Headline text (lower-third / stat / quote). */
   title?: string;

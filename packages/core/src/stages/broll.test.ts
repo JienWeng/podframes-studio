@@ -90,3 +90,36 @@ test("Pexels automation validates its key, omits empty searches, and preserves s
   assert.equal(requests, 1);
   assert.equal(project.state.broll.cues[0]!.videoPath, "broll/saved.mp4");
 });
+
+
+test("automatic planning keeps brief sticker-only actions separate from quote-card timing", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "podframes-action-stickers-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const project = await Project.create({ topic: "Writing and video", hosts: structuredClone(DEFAULT_HOSTS), options: { showBroll: false, showGraphics: true, autoStickers: true } }, root, "action-test");
+  project.state.script = { topic: "Writing and video", title: "Writing and video", hook: "", turns: [] };
+  project.state.speech = { audioPath: "audio.mp3", durationSec: 24, mediaType: "audio/mpeg", words: [], turns: [{
+    turnIndex: 0, hostId: "host_a", speaker: "HOST_A", text: "写文案，做 video，薪水还是一个人的。", start: 0, end: 24,
+    words: [{ text: "写文案，做 video，薪水还是一个人的。", start: 0, end: 24 }], segments: [], mediaType: "audio/mpeg", durationSec: 24,
+  }] };
+  let plans = 0;
+  const codex = {
+    async generateStructured() {
+      plans++;
+      if (plans === 1) return [
+        { type: "quote", stickerOnly: true, start: 1, end: 2.2, title: "写文案" },
+        { type: "quote", stickerOnly: true, start: 4, end: 5.4, title: "做 video" },
+        { type: "quote", start: 20, end: 23, title: "薪水还是一个人的" },
+      ];
+      return project.state.broll!.cues.map((cue) => ({ cueId: cue.id, decision: "none", stickerId: "", prompt: "", textTemplate: "comic" }));
+    },
+    async generateImageToFile() { throw new Error("No artwork should be generated for explicit none decisions."); },
+  };
+  // The fixture planner returns the two distinct schema shapes in sequence.
+  await runBroll({ project, codex: codex as StageContext["codex"], env: {}, reporter: new Reporter({ console: false }) });
+  assert.equal(plans, 2);
+  assert.deepEqual(project.state.broll!.cues.map(({ stickerOnly, start, end }) => ({ stickerOnly, start, end })), [
+    { stickerOnly: true, start: 1, end: 2.2 },
+    { stickerOnly: true, start: 4, end: 5.4 },
+    { stickerOnly: undefined, start: 20, end: 23 },
+  ]);
+});

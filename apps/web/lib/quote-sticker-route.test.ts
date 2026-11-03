@@ -6,13 +6,13 @@ import { test } from "node:test";
 import { DEFAULT_HOSTS, Project } from "@podframes/core";
 import { POST } from "../app/api/projects/[slug]/broll/[cueId]/regenerate/route";
 
-test("animated quote accepts a sticker upload and preserves its editable text and timing", async (t) => {
+for (const stickerOnly of [false, true]) test(`quote sticker upload preserves text and timing, standalone=${stickerOnly}`, async (t) => {
   const root = await mkdtemp(join(tmpdir(), "podframes-quote-sticker-"));
   const cwd = process.cwd();
   t.after(async () => { process.chdir(cwd); await rm(root, { recursive: true, force: true }); });
   await writeFile(join(root, "pnpm-workspace.yaml"), "packages: []");
   const project = await Project.create({ topic: "Sticker", hosts: structuredClone(DEFAULT_HOSTS) }, root, "episode");
-  project.state.broll = { cues: [{ id: "quote", type: "quote", textTemplate: "comic", stickerDirection: { decision: "existing", stickerId: "shocked", contextKey: "old-context" }, start: 2, end: 4, title: "薪水 leh？" }] };
+  project.state.broll = { cues: [{ id: "quote", type: "quote", textTemplate: stickerOnly ? undefined : "comic", stickerOnly, stickerDirection: { decision: "existing", stickerId: "shocked", contextKey: "old-context" }, start: 2, end: 4, title: "薪水 leh？" }] };
   await project.save();
   process.chdir(root);
   const params = { params: Promise.resolve({ slug: "episode", cueId: "quote" }) };
@@ -25,7 +25,8 @@ test("animated quote accepts a sticker upload and preserves its editable text an
   assert.equal(cue.title, "薪水 leh？");
   assert.equal(cue.start, 2);
   assert.equal(cue.end, 4);
-  assert.equal(cue.textTemplate, "comic");
+  assert.equal(cue.textTemplate, stickerOnly ? undefined : "comic");
+  assert.equal(cue.stickerOnly, stickerOnly);
   assert.equal(cue.stickerDirection, undefined);
   assert.match(cue.imagePath!, /^broll\/upload-.*\.png$/);
   assert.deepEqual(await readFile(project.abs(cue.imagePath!)), Buffer.from(bytes));

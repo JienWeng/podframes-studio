@@ -110,6 +110,17 @@ test("buildComposition tiles already-trimmed clips on the shortened audio window
   assert.match(sticker, /&lt;script&gt;/);
   assert.doesNotMatch(sticker, /<script>alert/);
   assert.match(sticker, /tl.set\('#sticker', \{ opacity: 0 \}, 2\)/);
+  const standalone = buildComposition({ ...input, cues: [{ id: "solo-sticker", type: "quote", stickerOnly: true, image: "media/reaction.png", title: "do-not-render-title", start: 0.5, end: 1.5 }] });
+  assert.match(standalone, /class="quote-sticker" src="media\/reaction.png"/);
+  assert.match(standalone, /solo-sticker \.quote-layout.*back.out\(2.2\)/);
+  assert.match(standalone, /solo-sticker \.quote-sticker.*duration: 1,/);
+  assert.doesNotMatch(standalone, /class="text-sticker"|<svg|do-not-render-title|solo-sticker \.text-sticker/);
+  const standaloneWithPreset = buildComposition({ ...input, cues: [{ id: "solo-preset", type: "quote", stickerOnly: true, textTemplate: "burst", image: "media/reaction.png", title: "do-not-render-title", start: 0.5, end: 1.5 }] });
+  assert.match(standaloneWithPreset, /class="quote-sticker" src="media\/reaction.png"/);
+  assert.doesNotMatch(standaloneWithPreset, /class="text-sticker"|<svg|do-not-render-title|solo-preset \.text-sticker/);
+  for (const duration of standalone.matchAll(/duration: (-?[\d.]+)/g)) assert.ok(Number(duration[1]) >= 0);
+  const missingStandalone = buildComposition({ ...input, cues: [{ id: "missing-sticker", type: "quote", stickerOnly: true, title: "do-not-render-title", start: 0.5, end: 1.5 }] });
+  assert.doesNotMatch(missingStandalone, /missing-sticker|do-not-render-title/);
   const hiddenSticker = buildComposition({ ...input, showGraphics: false, cues: [{ id: "sticker", type: "quote", textTemplate: "ribbon", title: "下班了", start: 0.5, end: 2 }] });
   assert.doesNotMatch(hiddenSticker, /id="sticker"/);
 

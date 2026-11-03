@@ -13,9 +13,10 @@ for (const aspectRatio of ["9:16", "16:9"] as const) {
   test(`${aspectRatio} quotes and stickers stay separate inside the lower safe band`, () => {
     const frame = aspectRatio === "9:16" ? { width: 1080, height: 1920 } : { width: 1920, height: 1080 };
     const captionTop = (frame.height - captionHeight) / frame.height * 100;
-    for (const hasSticker of [false, true]) {
-      const layout = quoteLayout(aspectRatio, hasSticker);
-      assert.deepEqual(layout, quoteLayout(aspectRatio, hasSticker));
+    for (const [hasSticker, stickerOnly] of [[false, false], [true, false], [true, true]] as const) {
+      const layout = quoteLayout(aspectRatio, hasSticker, stickerOnly);
+      assert.deepEqual(layout, quoteLayout(aspectRatio, hasSticker, stickerOnly));
+      if (!stickerOnly) assert.deepEqual(layout, quoteLayout(aspectRatio, hasSticker));
       assert.equal(!!layout.sticker, hasSticker);
       const canvas = (rectangle: typeof layout.card) => ({
         x: layout.container.x + rectangle.x * layout.container.width / 100,
@@ -44,17 +45,17 @@ for (const aspectRatio of ["9:16", "16:9"] as const) {
         };
       };
       const cardBounds = bounds(card, 2, 0);
-      const rectangles = [cardBounds];
+      const rectangles = stickerOnly ? [] : [{ ...cardBounds, shadow: 3 }];
       if (layout.sticker) {
         const sticker = canvas(layout.sticker);
         const stickerBounds = bounds(sticker, 6, sticker.height * 0.03);
-        assert.ok(stickerBounds.right < cardBounds.left, "sticker must never cover quote text");
-        rectangles.push(stickerBounds);
+        if (!stickerOnly) assert.ok(stickerBounds.right < cardBounds.left, "sticker must never cover quote text");
+        rectangles.push({ ...stickerBounds, shadow: 0 });
       }
       for (const rectangle of rectangles) {
         assert.ok(rectangle.left >= 5 && rectangle.right <= 95, "keep five-percent side margins");
         assert.ok(rectangle.top >= 58, "reserve the upper talking-head area");
-        assert.ok(rectangle.bottom + 3 / frame.height * 100 < captionTop, "including the card shadow, stay above actual two-row slam captions");
+        assert.ok(rectangle.bottom + rectangle.shadow / frame.height * 100 < captionTop, "including any card shadow, stay above actual two-row slam captions");
       }
     }
   });

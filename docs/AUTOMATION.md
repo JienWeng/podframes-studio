@@ -239,3 +239,7 @@ The studio and CLI/worker use the same stage. A template carries the setting int
 Manual sticker uploads remain usable. Removing a sticker records an explicit undecorated choice, so resuming the same plan respects that edit. Regenerating the entire beat plan makes new editorial decisions.
 
 Quote cards and stickers occupy separate layout slots. Preview and export share the same portrait/landscape geometry, with reserved upper host space and a separate caption band. This layout targets the studio's standard podcast framing. Review custom close-ups or imported footage whose subjects sit outside that framing.
+
+### Sticker-only action beats
+
+Automatic planning can illustrate concrete actions such as 写文案 or 做 video with a brief sticker-only beat, while retaining the normal spoken captions. The saved cue uses `type: "quote"` with `stickerOnly: true`; its `title` is the internal subject for selecting artwork and is omitted from the picture. The director uses literal action artwork instead of a generic reaction, and new images join the reusable sticker library. These beats last 1–2.5 seconds and have their own small planning budget within `maxCues`. In the studio, **Sticker only** switches an existing quote beat between artwork-only and quote-card presentation.

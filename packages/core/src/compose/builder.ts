@@ -264,6 +264,7 @@ export function buildComposition(input: BuildInput): string {
   // Cues. Minimal retains the original compact-card choreography. Rich modes
   // alternate zones, and Cinematic promotes image cues to full-frame moments.
   for (const [cueIndex, cue] of visibleCues.entries()) {
+    if (cue.stickerOnly && !cue.image) continue;
     const host = cue.hostId ? hostById.get(cue.hostId) : undefined;
     const color = host ? providerColor(providerOf(host)) : "#22D3EE";
     const start = r2(cue.start);
@@ -280,7 +281,7 @@ export function buildComposition(input: BuildInput): string {
     overlays.push(
       overlay(
         cue.id,
-        cueCls + (cue.textTemplate ? " animated-text" : "") + (cue.videoPath ? " footage-cutaway" : ""),
+        cueCls + (cue.textTemplate || cue.stickerOnly ? " animated-text" : "") + (cue.videoPath ? " footage-cutaway" : ""),
         start,
         dur,
         12,
@@ -289,15 +290,15 @@ export function buildComposition(input: BuildInput): string {
         start < introDur,
       ),
     );
-    if (cue.textTemplate) {
+    if (cue.textTemplate || cue.stickerOnly) {
       const entry = Math.min(0.42, dur / 3);
       tl.push(
         `    tl.set('#${cue.id}', { opacity: 1 }, ${start});`,
         `    tl.fromTo('#${cue.id} .quote-layout', { scale: 0.86, yPercent: 5 }, { scale: 1, yPercent: 0, duration: ${entry}, ease: 'back.out(2.2)' }, ${start});`,
-        `    tl.fromTo('#${cue.id} .text-sticker', { rotation: -2 }, { rotation: 2, duration: ${dur}, ease: 'sine.inOut' }, ${start});`,
         `    tl.to('#${cue.id}', { opacity: 0, duration: ${entry / 2} }, ${r2(end - entry / 2)});`,
         `    tl.set('#${cue.id}', { opacity: 0 }, ${end});`,
       );
+      if (!cue.stickerOnly) tl.push(`    tl.fromTo('#${cue.id} .text-sticker', { rotation: -2 }, { rotation: 2, duration: ${dur}, ease: 'sine.inOut' }, ${start});`);
       if (cue.image) tl.push(`    tl.fromTo('#${cue.id} .quote-sticker', { rotation: -6, yPercent: 3 }, { rotation: 6, yPercent: -3, duration: ${dur}, ease: 'sine.inOut' }, ${start});`);
     } else if (cue.type === "broll" && cue.image) {
       tl.push(`    tl.set('#${cue.id}', { opacity: 1 }, ${start});`);
@@ -365,10 +366,11 @@ function cueInner(
   color: string,
   aspectRatio: "9:16" | "16:9",
 ): string {
-  if (cue.textTemplate) {
-    const { container, card, sticker } = quoteLayout(aspectRatio, !!cue.image);
+  if (cue.textTemplate || cue.stickerOnly) {
+    const { container, card, sticker } = quoteLayout(aspectRatio, !!cue.image, cue.stickerOnly);
     const position = (rectangle: typeof container) => `left:${rectangle.x}%;top:${rectangle.y}%;width:${rectangle.width}%;height:${rectangle.height}%`;
-    return `<div class="quote-layout" style="${position(container)}"><div class="text-sticker" style="${position(card)}">${animatedTextSvg(cue.textTemplate, cue.title ?? "")}</div>${cue.image && sticker ? `<img class="quote-sticker" src="${esc(cue.image)}" alt="" style="${position(sticker)}" />` : ""}</div>`;
+    const text = !cue.stickerOnly && cue.textTemplate ? `<div class="text-sticker" style="${position(card)}">${animatedTextSvg(cue.textTemplate, cue.title ?? "")}</div>` : "";
+    return `<div class="quote-layout" style="${position(container)}">${text}${cue.image && sticker ? `<img class="quote-sticker" src="${esc(cue.image)}" alt="" style="${position(sticker)}" />` : ""}</div>`;
   }
   if (cue.type === "broll" && cue.image) {
     // A centered card laid OVER the avatar video, which keeps playing underneath —

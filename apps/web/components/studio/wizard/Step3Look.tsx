@@ -17,9 +17,9 @@ const QUOTE_STICKERS = [
 ] as const;
 
 const STICKER_STATUS = {
-  generate: "Automatic · artwork created for this quote",
+  generate: "Automatic · artwork created for this beat",
   existing: "Automatic · matched from the sticker library",
-  none: "This quote stays without a sticker",
+  none: "This beat stays without a sticker",
 } as const;
 
 const tc = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, "0")}`;
@@ -366,9 +366,9 @@ export function Step3Look() {
 
       <label className="mt-4 flex items-center gap-2 text-sm">
         <input type="checkbox" checked={options?.autoStickers !== false} disabled={disabled} onChange={(event) => void setOption({ autoStickers: event.target.checked })} />
-        Automatically direct quote stickers
+        Automatically direct stickers
       </label>
-      <p className="mt-1 text-xs text-[var(--color-text-secondary)]">Suggest beats chooses relevant saved artwork or creates a new sticker from the conversation. This setting carries into template episodes and automation. {options?.showGraphics === false && "Enable Graphic cards above to include quote artwork in the export."}</p>
+      <p className="mt-1 text-xs text-[var(--color-text-secondary)]">Suggest beats illustrates concrete actions with sticker-only beats and adds quote artwork where useful. This setting carries into template episodes and automation. {options?.showGraphics === false && "Enable Graphic cards above to include sticker artwork in the export."}</p>
       <label className="mt-4 block text-sm">B-roll source for new beats
         <select value={options?.brollSource ?? "images"} disabled={disabled} className={inputClass} onChange={(event) => void setOption({ brollSource: event.target.value, showBroll: true })}>
           <option value="images">Codex images</option>
@@ -431,6 +431,7 @@ export function Step3Look() {
           const patchField = (field: keyof Cue) => (e: { target: { value: string } }) =>
             setCues((c) => c.map((x, j) => (j === i ? { ...x, [field]: e.target.value } : x)));
           const span = Math.max(duration, cue.end + 1, 5);
+          const cueLabel = cue.stickerOnly ? "STICKER" : cue.textTemplate ? "ANIMATED TEXT" : TYPE_LABEL[cue.type];
           return (
             <div key={cue.id} className="flex gap-2.5 border border-[var(--color-hairline)] p-2.5">
               <div className="grid h-16 w-12 shrink-0 place-items-center overflow-hidden bg-[var(--color-surface-2)]">
@@ -438,12 +439,12 @@ export function Step3Look() {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={mediaUrl(ctx.slug!, cue.imagePath, project?.updatedAt)} alt="" className={`h-full w-full ${cue.type === "quote" ? "object-contain" : "object-cover"}`} />
                 ) : (
-                  <span className="mono text-center text-[8px] leading-tight text-[var(--color-text-muted)]">{cue.textTemplate ? "ANIMATED TEXT" : TYPE_LABEL[cue.type]}</span>
+                  <span className="mono text-center text-[8px] leading-tight text-[var(--color-text-muted)]">{cueLabel}</span>
                 )}
               </div>
               <div className="min-w-0 flex-1 space-y-1.5">
                 <div className="flex items-center gap-2">
-                  <span className="mono border border-[var(--color-hairline)] px-1 text-[9px] tracking-[0.04em] text-[var(--color-text-muted)]">{cue.textTemplate ? "ANIMATED TEXT" : TYPE_LABEL[cue.type]}</span>
+                  <span className="mono border border-[var(--color-hairline)] px-1 text-[9px] tracking-[0.04em] text-[var(--color-text-muted)]">{cueLabel}</span>
                   <button onClick={() => saveCues(cues.filter((_, j) => j !== i))} disabled={disabled} className="ml-auto text-xs text-[var(--color-text-muted)] hover:text-[var(--color-danger)] disabled:opacity-40" title="Remove" aria-label={`Remove ${cue.type} cue`}>✕</button>
                 </div>
 
@@ -468,7 +469,7 @@ export function Step3Look() {
                     onMouseUp={commitCues}
                     onTouchEnd={commitCues}
                     className="cue-range absolute inset-0 h-4 w-full"
-                    aria-label={`${cue.textTemplate ? "ANIMATED TEXT" : TYPE_LABEL[cue.type]} cue start`}
+                    aria-label={`${cueLabel} cue start`}
                   />
                   <input
                     type="range"
@@ -482,7 +483,7 @@ export function Step3Look() {
                     onMouseUp={commitCues}
                     onTouchEnd={commitCues}
                     className="cue-range absolute inset-0 h-4 w-full"
-                    aria-label={`${cue.textTemplate ? "ANIMATED TEXT" : TYPE_LABEL[cue.type]} cue end`}
+                    aria-label={`${cueLabel} cue end`}
                   />
                 </div>
                 <div className="mono flex items-center justify-between text-[9px] text-[var(--color-text-muted)]">
@@ -493,14 +494,18 @@ export function Step3Look() {
                 {cue.type === "stat" && (
                   <input value={cue.figure ?? ""} disabled={disabled} onChange={patchField("figure")} onBlur={() => saveCues(cues)} placeholder="figure, e.g. 42%" className={inputClass} />
                 )}
-                {cue.type === "quote" && <label className="block text-xs text-[var(--color-text-secondary)]">Text template
+                {cue.type === "quote" && !cue.stickerOnly && <label className="block text-xs text-[var(--color-text-secondary)]">Text template
                   <select aria-label="Text template" value={cue.textTemplate ?? ""} disabled={disabled} className={inputClass} onChange={(event) => void saveCues(cues.map((item, index) => index === i ? { ...item, textTemplate: event.target.value ? event.target.value as Cue["textTemplate"] : undefined } : item))}>
                     <option value="">Plain quote</option>
                     {TEXT_TEMPLATES.map((preset) => <option key={preset.value} value={preset.value}>{preset.label}</option>)}
                   </select>
                 </label>}
-                <input value={cue.title ?? ""} disabled={disabled} onChange={patchField("title")} onBlur={() => saveCues(cues)} placeholder={cue.type === "quote" ? "quote text" : "label"} className={inputClass} />
-                {cue.textTemplate && <div className="space-y-2">
+                <input value={cue.title ?? ""} disabled={disabled} onChange={patchField("title")} onBlur={() => saveCues(cues)} placeholder={cue.stickerOnly ? "Sticker subject" : cue.type === "quote" ? "quote text" : "label"} className={inputClass} />
+                {cue.type === "quote" && <label className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+                  <input type="checkbox" checked={cue.stickerOnly === true} disabled={disabled} onChange={(event) => void saveCues(cues.map((item, index) => index === i ? { ...item, stickerOnly: event.target.checked } : item))} />
+                  Sticker only
+                </label>}
+                {(cue.textTemplate || cue.stickerOnly) && <div className="space-y-2">
                   <p className="text-xs text-[var(--color-text-secondary)]">{
                     cue.stickerDirection?.decision === "generate" && !cue.imagePath
                       ? "Automatic · new artwork will be created at export"
@@ -534,7 +539,7 @@ export function Step3Look() {
                     </div>
                   </details>
                 </div>}
-                {cue.type !== "broll" && !cue.textTemplate && (
+                {cue.type !== "broll" && !cue.textTemplate && !cue.stickerOnly && (
                   <input value={cue.subtitle ?? ""} disabled={disabled} onChange={patchField("subtitle")} onBlur={() => saveCues(cues)} placeholder="subtitle (optional)" className={inputClass} />
                 )}
                 {cue.type === "broll" && (
