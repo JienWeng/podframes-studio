@@ -145,7 +145,7 @@ export function LibraryHome({
                 <div className="grid gap-5 sm:grid-cols-2">
                   <label className="block text-sm font-medium">
                     Speech model
-                    <select name="model" className={`${inputClass} mt-2`}>
+                    <select name="model" defaultValue="fish/drama-3" className={`${inputClass} mt-2`}>
                       <option value="fish/s2.1-pro">S2.1 Pro</option>
                       <option value="fish/drama-3">Drama 3</option>
                     </select>

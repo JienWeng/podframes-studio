@@ -21,12 +21,12 @@ export const PROVIDERS: ProviderMeta[] = [{
   label: "Fish Audio",
   color: PROVIDER_COLORS.fish!,
   models: [{
-    id: "fish/s2.1-pro",
-    label: "S2.1 Pro",
-    voices: FISH_VOICES,
-  }, {
     id: "fish/drama-3",
     label: "Drama 3",
+    voices: FISH_VOICES,
+  }, {
+    id: "fish/s2.1-pro",
+    label: "S2.1 Pro",
     voices: FISH_VOICES,
   }],
 }];

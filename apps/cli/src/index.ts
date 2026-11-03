@@ -48,8 +48,8 @@ OPTIONS
   --language <code>    Language code (default en)
   --slug <name>        Override the project folder name
 
-  --host-a "<name|model|voice>"   e.g. "Ada|fish/s2.1-pro|<reference-id>"
-  --host-b "<name|model|voice>"   e.g. "Theo|fish/s2.1-pro|<reference-id>"
+  --host-a "<name|model|voice>"   e.g. "Ada|fish/drama-3|<reference-id>"
+  --host-b "<name|model|voice>"   e.g. "Theo|fish/drama-3|<reference-id>"
 
   --writer <provider/model> Writing model, e.g. claude-code/sonnet or openai/<model>
   --cue-writer <provider/model> Optional separate supporting-visual planner

@@ -104,7 +104,7 @@ Codex uses `gpt-6.1-sol` by default. If it reports capacity before any speech-ge
 
 ## Fish Audio voices
 
-The studio includes public reference voices from [Fish's quickstart](https://docs.fish.audio/developer-guide/getting-started/quickstart). Paste a different Fish voice reference ID in the cast editor to use your own voice. The default model is `fish/s2.1-pro`.
+The studio includes public reference voices from [Fish's quickstart](https://docs.fish.audio/developer-guide/getting-started/quickstart). Paste a different Fish voice reference ID in the cast editor to use your own voice. The default model is `fish/drama-3`.
 
 Voice previews and full turns use the official [Fish MCP connection](https://docs.fish.audio/overview/mcp), authenticated through Codex OAuth. Each request checks website credit and text limits. The free plan currently limits a speech call to 500 UTF-8 bytes; Chinese characters usually use three bytes each. Advanced developer API tuning options are not supported in website-credit mode.
 
