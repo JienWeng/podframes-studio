@@ -110,3 +110,9 @@ The connection check follows the provider model-list endpoints. [OpenAI model li
 Saved cast can be edited with multipart `PATCH /api/v1/library`. Supply `id`, `version` (the saved `revision`, falling back to `updatedAt` or `createdAt` for older records), `name`, `model`, `voice`, `style`, `persona`, and `appearance`. A `portrait` file is optional. A stale version returns HTTP 409. Updates keep the cast ID and apply when the character is reused. Existing episode copies and series snapshots retain their saved settings until explicitly changed.
 
 Cast portrait regeneration accepts JSON `version` and `appearance` and requires an `Idempotency-Key` on both Studio and versioned API routes. It returns PNG bytes and uses ChatGPT image allowance. The saved cast changes only when you submit the image through the existing multipart cast-edit endpoint. Regeneration is included in the daily generation-operation limit. Use a new request key only for a deliberate new generation.
+
+Presentation toggles are `options.showIntro`, `options.showBroll`, and `options.showGraphics`. Changes require only compose/render. Opening titles default off. Studio includes Clean podcast, Short-form social, and Variety show presets.
+
+Use multipart `POST /api/v1/projects/{slug}/broll/{cueId}/footage` with `file`, or JSON `{ "url": "https://.../clip.mp4" }`, to replace an existing B-roll cue with footage. Direct public HTTPS MP4/WebM links and files up to 50 MB are supported. Imports normalize the first 30 seconds and remove clip audio. Player/article/social post URLs require a downloaded video file. Create a timed `broll` cue first through the project PATCH endpoint.
+
+`options.generateBrollImages=false` plans supporting beats without buying generated images. The Variety show preset uses this setting so footage beats can be filled with uploads or direct video URLs.

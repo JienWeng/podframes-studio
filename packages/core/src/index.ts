@@ -100,3 +100,5 @@ export type { GenerationClient } from "./clients/writing";
 export { automationJobs, enqueueAutomation, claimAutomation, automationEvent, cancelAutomation, workerHeartbeat, workerOnline } from "./automation";
 export type { AutomationJob, AutomationEvent } from "./automation";
 export { durableRead, durableUpdate } from "./util/durable";
+
+export { run as runProcess } from "./util/proc";

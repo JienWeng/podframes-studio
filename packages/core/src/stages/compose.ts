@@ -87,9 +87,11 @@ export async function runCompose(ctx: StageContext): Promise<void> {
   // are the HyperFrames component visuals); image cues get their file linked in.
   const cues: Array<Cue & { image?: string }> = [];
   for (const cue of broll?.cues ?? []) {
+    if (cue.type === "broll" ? options.showBroll === false : options.showGraphics === false) continue;
     let image: string | undefined;
-    if (cue.imagePath) {
-      const dest = await linkInto(project.abs(cue.imagePath), `${mediaDir}/broll`, `${cue.id}${extname(cue.imagePath) || ".png"}`);
+    const mediaPath = cue.videoPath ?? cue.imagePath;
+    if (mediaPath) {
+      const dest = await linkInto(project.abs(mediaPath), `${mediaDir}/broll`, `${cue.id}${extname(mediaPath) || ".png"}`);
       image = `media/broll/${basename(dest)}`;
     }
     cues.push({ ...cue, ...(image ? { image } : {}) });
@@ -140,6 +142,9 @@ export async function runCompose(ctx: StageContext): Promise<void> {
     cues: timedCues,
     hostAvatars,
     visualTreatment: options.visualTreatment,
+    showIntro: options.showIntro,
+    showBroll: options.showBroll,
+    showGraphics: options.showGraphics,
     captionStyle: options.captionStyle,
     captionColor: options.captionColor,
   });

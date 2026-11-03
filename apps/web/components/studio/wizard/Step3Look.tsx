@@ -19,7 +19,7 @@ const TYPE_LABEL: Record<Cue["type"], string> = { broll: "B-ROLL", stat: "STAT",
 export function Step3Look() {
   const ctx = useWizard();
   const { project, locked, busy, running } = ctx;
-  const { duration, seek } = useTransport();
+  const { duration, seek, time } = useTransport();
   const options = project?.options;
   const color = options?.captionColor ?? "#22D3EE";
   const treatment = options?.visualTreatment ?? "minimal";
@@ -31,6 +31,7 @@ export function Step3Look() {
   const [cues, setCues] = useDraft<Cue[]>(project?.cues ?? [], JSON.stringify(project?.cues ?? []));
   const [regenId, setRegenId] = useState<string | null>(null);
   const [imageError, setImageError] = useState("");
+  const [videoUrls, setVideoUrls] = useState<Record<string, string>>({});
 
   const setOption = (patch: Record<string, unknown>) => ctx.patch({ options: patch as never });
   const saveCues = async (next: Cue[]) => {
@@ -89,15 +90,131 @@ export function Step3Look() {
     setImageError("");
     try {
       if (!(await ctx.patch({ cues }))) return;
-      await uploadCuePhoto(ctx.slug, cue.id, file);
+      if (
+        /\.(mp4|webm|mov)$/i.test(file.name) ||
+        file.type.startsWith("video/")
+      ) {
+        const body = new FormData();
+        body.set("file", file);
+        const response = await fetch(
+          `/api/projects/${ctx.slug}/broll/${cue.id}/footage`,
+          { method: "POST", body },
+        );
+        if (!response.ok) throw new Error(await response.text());
+      } else await uploadCuePhoto(ctx.slug, cue.id, file);
       await ctx.refresh();
     } catch (error) { setImageError(error instanceof Error ? error.message : String(error)); }
     finally { setRegenId(null); }
   }
 
+  async function importFootage(cue: Cue) {
+    if (!ctx.slug || !videoUrls[cue.id]) return;
+    setRegenId(cue.id);
+    setImageError("");
+    try {
+      if (!(await ctx.patch({ cues }))) return;
+      const response = await fetch(
+        `/api/projects/${ctx.slug}/broll/${cue.id}/footage`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: videoUrls[cue.id] }),
+        },
+      );
+      if (!response.ok) throw new Error(await response.text());
+      await ctx.refresh();
+    } catch (error) {
+      setImageError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setRegenId(null);
+    }
+  }
+
   return (
     <div>
       <StepHeader title="B-roll & captions" hint="Captions ride the word-level timing automatically — pick a look. B-roll is optional." />
+      <section className="my-5 space-y-4 rounded-xl border border-[var(--color-hairline)] p-4">
+        <h3 className="text-sm font-semibold">Edit template</h3>
+        <div className="grid gap-2 sm:grid-cols-3">
+          {[
+            {
+              label: "Clean podcast",
+              hint: "Hosts and quiet captions",
+              patch: {
+                visualTreatment: "minimal",
+                captionStyle: "clean",
+                captionColor: "#FFFFFF",
+                showIntro: false,
+                showBroll: false,
+                showGraphics: false,
+              },
+            },
+            {
+              label: "Short-form social",
+              hint: "Hosts and punchy yellow captions",
+              patch: {
+                visualTreatment: "minimal",
+                captionStyle: "bold",
+                captionColor: "#FFE45E",
+                showIntro: false,
+                showBroll: false,
+                showGraphics: false,
+              },
+            },
+            {
+              label: "Variety show · 综艺",
+              hint: "Bold captions, reaction footage and graphic beats",
+              patch: {
+                visualTreatment: "editorial",
+                captionStyle: "slam",
+                captionColor: "#FFE45E",
+                showIntro: false,
+                showBroll: true,
+                generateBrollImages: false,
+                showGraphics: true,
+              },
+            },
+          ].map((preset) => (
+            <button
+              key={preset.label}
+              type="button"
+              disabled={disabled}
+              onClick={() => void setOption(preset.patch)}
+              aria-pressed={Object.entries(preset.patch).every(
+                ([key, value]) =>
+                  options?.[key as keyof typeof options] === value,
+              )}
+              className="rounded-xl border border-[var(--color-control-border)] bg-[var(--color-surface-2)] p-3 text-left text-sm aria-pressed:border-[var(--color-accent)] aria-pressed:ring-1 aria-pressed:ring-[var(--color-accent)] disabled:opacity-50"
+            >
+              <strong className="block">{preset.label}</strong>
+              <span className="mt-1 block text-xs text-[var(--color-text-secondary)]">
+                {preset.hint}
+              </span>
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-4">
+          {(
+            [
+              { key: "showIntro", label: "Opening title" },
+              { key: "showBroll", label: "B-roll photos & footage" },
+              { key: "showGraphics", label: "Graphic cards" },
+            ] as const
+          ).map(({ key, label }) => (
+            <label key={key} className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={options?.[key] !== false}
+                disabled={disabled}
+                onChange={(event) =>
+                  void setOption({ [key]: event.target.checked })
+                }
+              />
+              {label}
+            </label>
+          ))}
+        </div>
+      </section>
 
       {/* Visual treatment — the original composition remains the default. Richer
           modes reuse every paid host clip and only invalidate compose/render. */}
@@ -159,6 +276,8 @@ export function Step3Look() {
         })}
       </div>
 
+      {options?.showBroll !== false && <label className="mt-4 flex items-center gap-2 text-sm"><input type="checkbox" checked={options?.generateBrollImages !== false} disabled={disabled} onChange={(event) => void setOption({ generateBrollImages: event.target.checked })} />Generate AI B-roll images when suggesting beats</label>}
+      {options?.showBroll === false && <p className="mt-4 text-xs text-[var(--color-text-muted)]">B-roll is hidden in this export. Enable its toggle to use these beats.</p>}
       {/* B-roll */}
       <div className="mono mb-2 mt-6 flex items-center justify-between text-[10px] tracking-[0.08em] text-[var(--color-text-muted)]">
         <span>B-ROLL{cues.length ? ` · ${cues.length}` : ""}</span>
@@ -168,7 +287,30 @@ export function Step3Look() {
       <button onClick={suggest} disabled={disabled} className="btn btn-ghost w-full py-2 text-sm disabled:opacity-50">
         {running ? "Thinking…" : cues.length ? `↻ Re-suggest ${treatment} beats` : `Suggest ${treatment} beats`}
       </button>
-      <p className="mt-2 text-xs text-[var(--color-text-muted)]">Use your own photography or screenshots for a documentary edit. Upload a photo on any image cue; its timing and camera motion stay in place.</p>
+      <button
+        type="button"
+        disabled={disabled || duration < 0.3}
+        onClick={() =>
+          void saveCues([
+            ...cues,
+            {
+              id: `footage-${crypto.randomUUID()}`,
+              type: "broll",
+              start: Math.max(0, Math.min(time, duration - 0.3)),
+              end: Math.min(duration, Math.max(0, time) + 3),
+              title: "",
+            },
+          ])
+        }
+        className="btn btn-ghost mt-2 w-full py-2 text-sm disabled:opacity-50"
+      >
+        + Add footage / reaction beat
+      </button>
+      <p className="mt-2 text-xs text-[var(--color-text-muted)]">
+        Use short reaction shots, cutaways or reference clips. Upload MP4/WebM
+        footage or paste a direct HTTPS video link. Clip audio is muted so the
+        hosts keep speaking.
+      </p>
       {imageError && <p role="alert" className="mt-2 text-xs text-[var(--color-danger)]">{imageError}</p>}
 
       <div className="mt-3 space-y-2">
@@ -179,7 +321,7 @@ export function Step3Look() {
           return (
             <div key={cue.id} className="flex gap-2.5 border border-[var(--color-hairline)] p-2.5">
               <div className="grid h-16 w-12 shrink-0 place-items-center overflow-hidden bg-[var(--color-surface-2)]">
-                {cue.type === "broll" && cue.imagePath ? (
+                {cue.type === "broll" && cue.videoPath ? <video src={mediaUrl(ctx.slug!, cue.videoPath, project?.updatedAt)} muted playsInline className="h-full w-full object-cover" /> : cue.type === "broll" && cue.imagePath ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={mediaUrl(ctx.slug!, cue.imagePath, project?.updatedAt)} alt="" className="h-full w-full object-cover" />
                 ) : (
@@ -244,8 +386,8 @@ export function Step3Look() {
                 )}
                 {cue.type === "broll" && (
                   <label className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
-                    <span>{regenId === cue.id ? "Updating…" : cue.imagePath?.startsWith("broll/upload-") ? "Replace photo" : "Upload photo"}</span>
-                    <input type="file" accept="image/png,image/jpeg,image/webp" disabled={disabled || regenId !== null} className="min-w-0 flex-1 text-xs" onChange={(event) => {
+                    <span>{regenId === cue.id ? "Updating…" : (cue.videoPath || cue.imagePath?.startsWith("broll/upload-")) ? "Replace media" : "Upload photo or footage"}</span>
+                    <input type="file" accept="image/png,image/jpeg,image/webp,video/mp4,video/webm" disabled={disabled || regenId !== null} className="min-w-0 flex-1 text-xs" onChange={(event) => {
                       const file = event.currentTarget.files?.[0];
                       event.currentTarget.value = "";
                       if (file) void upload(cue, file);
@@ -253,9 +395,37 @@ export function Step3Look() {
                   </label>
                 )}
                 {cue.type === "broll" && (
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <input
+                      type="url"
+                      aria-label="Direct video URL"
+                      value={videoUrls[cue.id] ?? ""}
+                      disabled={disabled || regenId !== null}
+                      onChange={(event) =>
+                        setVideoUrls((urls) => ({
+                          ...urls,
+                          [cue.id]: event.target.value,
+                        }))
+                      }
+                      placeholder="Direct HTTPS MP4/WebM link"
+                      className={`${inputClass} min-w-0`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void importFootage(cue)}
+                      disabled={
+                        disabled || regenId !== null || !videoUrls[cue.id]
+                      }
+                      className="btn btn-ghost shrink-0 px-3 text-xs disabled:opacity-50"
+                    >
+                      Import footage
+                    </button>
+                  </div>
+                )}
+                {cue.type === "broll" && (
                   <div className="flex gap-2">
                     <textarea value={cue.imagePrompt ?? ""} disabled={disabled} onChange={(e) => setCues((c) => c.map((x, j) => (j === i ? { ...x, imagePrompt: e.target.value } : x)))} rows={2} placeholder="image prompt" className={`${inputClass} resize-none`} />
-                    <button onClick={() => regen(cue)} disabled={disabled || !cue.imagePrompt || regenId !== null} className="btn btn-ghost shrink-0 px-3 text-xs disabled:opacity-50" title="Generate an AI illustration to replace this image">{regenId === cue.id ? "…" : "Generate AI"}</button>
+                    <button onClick={() => regen(cue)} disabled={disabled || options?.generateBrollImages === false || !cue.imagePrompt || regenId !== null} className="btn btn-ghost shrink-0 px-3 text-xs disabled:opacity-50" title="Generate an AI illustration to replace this image">{regenId === cue.id ? "…" : "Generate AI"}</button>
                   </div>
                 )}
               </div>

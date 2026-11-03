@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  experimental: { proxyClientMaxBodySize: "55mb" },
   // Compile the workspace core package (TS source) for the server.
   transpilePackages: ["@podframes/core"],
   // Keep heavy, node-only deps external so Next doesn't bundle them.

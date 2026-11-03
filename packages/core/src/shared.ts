@@ -220,6 +220,9 @@ export const INVALIDATION = {
 
 /** Option keys whose edit invalidates stages → the {@link INVALIDATION} entry each maps to. */
 const OPTION_INVALIDATION = {
+  showIntro: "visualTreatment",
+  showBroll: "visualTreatment",
+  showGraphics: "visualTreatment",
   captionStyle: "captions",
   captionColor: "captions",
   visualTreatment: "visualTreatment",

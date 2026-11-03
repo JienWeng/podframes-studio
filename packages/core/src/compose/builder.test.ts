@@ -110,6 +110,57 @@ test("buildComposition tiles already-trimmed clips on the shortened audio window
   assert.match(motion, /"scale":1\.28,"xPercent":3,"yPercent":-1\.5/);
   assert.doesNotMatch(motion, /clipPath: 'inset\(0 100% 0 0\)'|VISUAL 01|stat-meter/);
   assert.match(motion, /-webkit-line-clamp:2/);
+  const layered = {
+    ...input,
+    visualTreatment: "editorial" as const,
+    cues: [
+      {
+        id: "test-footage",
+        type: "broll" as const,
+        start: 0.5,
+        end: 2,
+        image: "media/broll/clip.mp4",
+        videoPath: "broll/clip.mp4",
+      },
+      {
+        id: "test-graphic",
+        type: "stat" as const,
+        start: 2,
+        end: 3.5,
+        figure: "5",
+      },
+    ],
+  };
+  const clean = buildComposition({
+    ...layered,
+    showIntro: false,
+    showBroll: false,
+    showGraphics: false,
+  });
+  assert.doesNotMatch(
+    clean,
+    /id="episode-open"|id="test-footage"|id="test-graphic"/,
+  );
+  const footage = buildComposition({
+    ...layered,
+    showIntro: false,
+    showBroll: true,
+    showGraphics: false,
+  });
+  assert.match(
+    footage,
+    /<video id="test-footage-footage"[^>]*src="media\/broll\/clip.mp4"[^>]*muted[^>]*data-start="0.5"/,
+  );
+  assert.doesNotMatch(footage, /id="test-graphic"|id="episode-open"/);
+  const graphics = buildComposition({
+    ...layered,
+    showIntro: true,
+    showBroll: false,
+    showGraphics: true,
+  });
+  assert.match(graphics, /id="episode-open"/);
+  assert.match(graphics, /id="test-graphic"/);
+  assert.doesNotMatch(graphics, /id="test-footage"/);
 });
 
 test("buildComposition keeps multi-segment tracks exactly contiguous (no authored gaps)", () => {

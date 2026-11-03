@@ -69,6 +69,9 @@ export function validateOptions(options: Partial<PipelineOptions>, fail?: (msg: 
     if (!known.has(key)) raise(`unknown option "${key}" (valid: ${[...known].join(", ")})`);
   }
   const o = options;
+  for (const key of ["showIntro", "showBroll", "showGraphics", "generateBrollImages"] as const) {
+    if (o[key] !== undefined && typeof o[key] !== "boolean") raise(`${key} must be true or false`);
+  }
   for (const key of ["scriptModel", "cueModel"] as const) {
     if (o[key] !== undefined) {
       if (typeof o[key] !== "string") raise(`${key} must be a writing model ID.`);

@@ -125,6 +125,10 @@ export interface PipelineOptions {
   gapMs: number;
   /** Visual composition mode. `minimal` preserves the original sparse podcast treatment. */
   visualTreatment: VisualTreatment;
+  showIntro: boolean;
+  showBroll: boolean;
+  generateBrollImages: boolean;
+  showGraphics: boolean;
   /** Hard ceiling on b-roll/overlay cues (the effective budget depends on visualTreatment). */
   maxCues: number;
   /** Final render quality. */
@@ -257,6 +261,8 @@ export interface Cue {
   imagePrompt?: string;
   /** Filled after image generation (relative path). */
   imagePath?: string;
+  videoPath?: string;
+  sourceUrl?: string;
   /** Which host this cue supports, for color + attribution. */
   hostId?: string;
 }

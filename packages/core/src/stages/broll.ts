@@ -74,7 +74,15 @@ export async function runBroll(ctx: StageContext): Promise<void> {
     return;
   }
 
-  const cueTypes: CueType[] = ["broll", "lower-third", "stat", "quote"];
+  if (options.showBroll === false && options.showGraphics === false) {
+    project.state.broll = { cues: [] };
+    project.markDone("broll");
+    await project.save();
+    log.success("Supporting visuals disabled");
+    return;
+  }
+
+  const cueTypes: CueType[] = [...(options.showBroll !== false ? ["broll" as const] : []), ...(options.showGraphics !== false ? ["lower-third", "stat", "quote"] as const : [])];
 
   // The original minimal treatment stays intentionally sparse. Editorial and
   // cinematic are opt-in and raise the beat budget without changing avatar spend.
@@ -176,11 +184,12 @@ export async function runBroll(ctx: StageContext): Promise<void> {
   // needs no cropping; cinematic's full-frame takeovers get canvas-aspect 2K
   // sources instead (see brollImageGeometry).
   const geometry = brollImageGeometry(options.visualTreatment, config.aspectRatio);
-  const brollCues = cleaned.filter((c) => c.type === "broll" && (c.imagePrompt || c.imagePath));
+  const brollCues = cleaned.filter((c) => options.showBroll !== false && options.generateBrollImages !== false && c.type === "broll" && (c.imagePrompt || c.imagePath));
   if (brollCues.length)
     log.info(`generating ${brollCues.length} b-roll images with ${options.brollImageModel}`);
 
   for (const cue of brollCues) {
+    if (cue.videoPath) continue;
     if (signal?.aborted) throw new Error("run cancelled");
     if (cue.imagePath?.startsWith("broll/upload-") || project.state.brollLibrary?.some((image) => image.imagePath === cue.imagePath)) {
       if (!cue.imagePath || !fileExists(project.abs(cue.imagePath))) throw new Error(`Uploaded photo for ${cue.id} is missing. Upload it again.`);

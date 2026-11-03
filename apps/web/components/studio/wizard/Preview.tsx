@@ -72,7 +72,7 @@ export function Preview() {
   // you scrub/play to that point. Only "broll" cues carry an image (a full-frame photo that
   // covers the host, per compose/builder.ts); "stat"/"quote"/"lower-third" are text cards
   // laid OVER the still-visible host, so those render as an overlay, not a replacement.
-  const cues: Cue[] = project?.cues ?? [];
+  const cues: Cue[] = (project?.cues ?? []).filter((cue) => cue.type === "broll" ? project?.options.showBroll !== false : project?.options.showGraphics !== false);
   const timedCues = trimTimeline.hasTrim ? mapCuesToTrimmedTimeline(cues, trimTimeline.segments, displayDuration) : cues;
   // Index, not just the cue — the render alternates editorial card sides by cue
   // index (compose/builder.ts cue-side-*), and the preview must mirror that.
@@ -177,7 +177,7 @@ export function Preview() {
                 never erased by it. */}
             {activeCue && <CueCard cue={activeCue} cueIndex={activeCueIndex} time={displayTime} color={cueColor(activeCue)} slug={slug} updatedAt={project?.updatedAt} treatment={visualTreatment} />}
             {region && <Karaoke region={region} time={displayTime} style={captionStyle} color={captionColor} />}
-            {visualTreatment !== "minimal" &&
+            {(project?.options.showIntro ?? visualTreatment !== "minimal") &&
               displayDuration > TREATMENT_INTRO.minEpisodeSec &&
               displayTime < Math.min(TREATMENT_INTRO.maxSec, displayDuration) && (
                 <TreatmentIntro
@@ -393,10 +393,38 @@ function ClipRail({ regions, started, finished }: { regions: TurnRegion[]; start
  *  matches what the real render actually draws over the (still-visible) host.
  *  `cueIndex` drives the editorial side alternation — same modulo as the render. */
 function CueCard({ cue, cueIndex, time, color, slug, updatedAt, treatment }: { cue: Cue; cueIndex: number; time: number; color: string; slug: string | null; updatedAt?: string; treatment: VisualTreatment }) {
+  const footageRef = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const video = footageRef.current;
+    if (video && Number.isFinite(video.duration))
+      video.currentTime = Math.max(
+        0,
+        Math.min(time - cue.start, video.duration - 0.01),
+      );
+  }, [time, cue.start, cue.videoPath]);
   // Mirrors builder.ts: even cues sit right, odd cues left (editorial only).
   const editorialSide = cueIndex % 2 === 0 ? "justify-end" : "justify-start";
   if (cue.type === "broll") {
-    if (!cue.imagePath || !slug) return null;
+    if ((!cue.imagePath && !cue.videoPath) || !slug) return null;
+    if (cue.videoPath)
+      return (
+        <div className="absolute inset-0 bg-black">
+          <video
+            key={cue.videoPath}
+            ref={footageRef}
+            src={mediaUrl(slug, cue.videoPath, updatedAt)}
+            muted
+            playsInline
+            onLoadedMetadata={(event) => {
+              event.currentTarget.currentTime = Math.max(
+                0,
+                Math.min(time - cue.start, event.currentTarget.duration - 0.01),
+              );
+            }}
+            className="h-full w-full object-contain"
+          />
+        </div>
+      );
     const elapsed = time - cue.start;
     const motion = brollMotionAt(cueIndex, elapsed, cue.end - cue.start);
     const imageStyle = { transform: `translate(${motion.xPercent}%, ${motion.yPercent}%) scale(${motion.scale})` };
@@ -405,7 +433,7 @@ function CueCard({ cue, cueIndex, time, color, slug, updatedAt, treatment }: { c
       return (
         <div key={cue.id} className="absolute inset-0 overflow-hidden bg-black" style={cardStyle}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={mediaUrl(slug, cue.imagePath, updatedAt)} alt="" className="h-full w-full object-cover" style={imageStyle} />
+          <img src={mediaUrl(slug, cue.imagePath!, updatedAt)} alt="" className="h-full w-full object-cover" style={imageStyle} />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/5 to-black/25" />
           {cue.title && <div className="absolute inset-x-5 bottom-[17%] border-l-4 pl-3 text-lg font-extrabold leading-tight text-white" style={{ borderColor: color }}>{cue.title}</div>}
         </div>
@@ -415,7 +443,7 @@ function CueCard({ cue, cueIndex, time, color, slug, updatedAt, treatment }: { c
       <div className={`absolute inset-0 flex px-[8%] ${treatment === "editorial" ? `items-start ${editorialSide} pt-[9%]` : "items-center justify-center"}`}>
         <div key={cue.id} style={cardStyle} className={`relative aspect-square overflow-hidden border border-[var(--color-hairline)] shadow-lg ${treatment === "editorial" ? "w-[70%] max-w-[250px]" : "w-[60%] max-w-[220px]"}`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={mediaUrl(slug, cue.imagePath, updatedAt)} alt="" className="h-full w-full object-cover" style={imageStyle} />
+          <img src={mediaUrl(slug, cue.imagePath!, updatedAt)} alt="" className="h-full w-full object-cover" style={imageStyle} />
           <div className="absolute inset-0 bg-gradient-to-b from-black/0 via-black/0 to-black/75" />
           {cue.title && (
             <div className="absolute inset-x-2.5 bottom-2 flex items-center gap-1.5 overflow-hidden text-[11px] font-bold text-white">

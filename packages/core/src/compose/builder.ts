@@ -76,6 +76,9 @@ export interface BuildInput {
   hostAvatars?: Record<string, string>;
   /** Additive visual treatment. Omitted means the original minimal composition. */
   visualTreatment?: VisualTreatment;
+  showIntro?: boolean;
+  showBroll?: boolean;
+  showGraphics?: boolean;
 }
 
 interface Tile {
@@ -141,6 +144,7 @@ function fade(
 export function buildComposition(input: BuildInput): string {
   const { width, height, durationSec } = input;
   const treatment = input.visualTreatment ?? "minimal";
+  const visibleCues = input.cues.filter((cue) => cue.type === "broll" ? input.showBroll !== false : input.showGraphics !== false);
   const hostById = new Map(input.hosts.map((h) => [h.id, h]));
   // Hosts whose face is mirrored horizontally — applied as a static transform on their tiles.
   const flipped = new Set(input.hosts.filter((h) => h.flip).map((h) => h.id));
@@ -232,7 +236,7 @@ export function buildComposition(input: BuildInput): string {
   // original composition path. Elements the slate covers (opening captions/cues)
   // get the occlusion opt-out below — introDur is that window.
   const introDur =
-    treatment !== "minimal" && durationSec > TREATMENT_INTRO.minEpisodeSec
+    (input.showIntro ?? treatment !== "minimal") && durationSec > TREATMENT_INTRO.minEpisodeSec
       ? r2(Math.min(TREATMENT_INTRO.maxSec, durationSec))
       : 0;
   if (introDur > 0) {
@@ -258,7 +262,7 @@ export function buildComposition(input: BuildInput): string {
 
   // Cues. Minimal retains the original compact-card choreography. Rich modes
   // alternate zones, and Cinematic promotes image cues to full-frame moments.
-  for (const [cueIndex, cue] of input.cues.entries()) {
+  for (const [cueIndex, cue] of visibleCues.entries()) {
     const host = cue.hostId ? hostById.get(cue.hostId) : undefined;
     const color = host ? providerColor(providerOf(host)) : "#22D3EE";
     const start = r2(cue.start);
@@ -275,7 +279,7 @@ export function buildComposition(input: BuildInput): string {
     overlays.push(
       overlay(
         cue.id,
-        cueCls,
+        cueCls + (cue.videoPath ? " footage-cutaway" : ""),
         start,
         dur,
         12,
@@ -353,7 +357,7 @@ function cueInner(
     // A centered card laid OVER the avatar video, which keeps playing underneath —
     // same tier as the stat/quote/lower-third cards below, not a full-screen takeover.
     return `      <div class="broll-card">
-        <img class="broll-img" src="${cue.image}" crossorigin="anonymous" alt="" data-layout-allow-overflow />
+        ${cue.videoPath ? `<video id="${cue.id}-footage" class="clip broll-img" src="${esc(cue.image!)}" muted playsinline data-start="${r2(cue.start)}" data-duration="${r2(cue.end - cue.start)}" data-track-index="30" data-volume="0" data-layout-allow-overflow></video>` : `<img class="broll-img" src="${cue.image}" crossorigin="anonymous" alt="" data-layout-allow-overflow />`}
         <div class="broll-scrim"></div>
         ${cue.title ? `<div class="broll-label" style="--ch:${color}"><span class="tick"></span>${esc(cue.title)}</div>` : ""}
       </div>`;
@@ -474,6 +478,7 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;
 /* B-roll is a COMPACT corner card pinned top-right, OVER the avatar video — small
    enough that the host's face (center frame) is never covered. Not a takeover. */
 .broll{display:flex;justify-content:flex-end;align-items:flex-start;padding:48px}
+.overlay.footage-cutaway.broll{padding:0}.overlay.footage-cutaway.broll .broll-card{width:100%;height:100%;aspect-ratio:auto;border:0}.footage-cutaway .broll-img{object-fit:contain;background:#000}
 .broll-card{position:relative;width:min(400px,34%);aspect-ratio:1/1;overflow:hidden;
   border:1px solid var(--hairline);box-shadow:0 24px 70px rgba(0,0,0,.55);transform-origin:80% 20%}
 .broll-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform-origin:center}

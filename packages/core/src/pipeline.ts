@@ -204,8 +204,8 @@ async function runPipeline(project: Project, opts: GenerateOptions, root: string
   }
 
   if (willRun.some((s) => s.name === "script")) await assertWritingReady(project.state.options.scriptModel);
-  if (willRun.some((s) => s.name === "broll")) await assertWritingReady(project.state.options.cueModel);
-  if (willRun.some((s) => ["speech", "stills", "broll"].includes(s.name)) && !(await codexStatus())) {
+  if (willRun.some((s) => s.name === "broll") && (project.state.options.showBroll !== false || project.state.options.showGraphics !== false)) await assertWritingReady(project.state.options.cueModel);
+  if (willRun.some((s) => ["speech", "stills"].includes(s.name) || (s.name === "broll" && project.state.options.showBroll !== false && project.state.options.generateBrollImages !== false)) && !(await codexStatus())) {
     throw new Error("Codex ChatGPT login required: install Codex CLI, then run `codex login`.");
   }
   if (willRun.some((s) => s.name === "video") && project.state.options.videoProvider === "heygen") {

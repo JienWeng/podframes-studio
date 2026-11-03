@@ -39,6 +39,15 @@ test("resuming B-roll preserves uploaded photos and never silently regenerates a
   delete project.state.stages.broll;
   await rm(project.abs(cue.imagePath));
   await assert.rejects(runBroll(ctx), /Uploaded photo.*missing/);
+  project.state.options.generateBrollImages = false;
+  project.state.broll = { cues: [{ id: "footage-plan", type: "broll", start: 1, end: 4, imagePrompt: "A surprised reaction shot" }] };
+  await runBroll(ctx);
+  assert.equal(project.state.broll.cues[0]!.imagePath, undefined);
+  delete project.state.stages.broll;
+  project.state.options.showBroll = false;
+  project.state.options.showGraphics = false;
+  await runBroll(ctx);
+  assert.deepEqual(project.state.broll.cues, []);
 });
 
 test("b-roll pans throughout the cue, alternates direction, and scrubs deterministically", () => {

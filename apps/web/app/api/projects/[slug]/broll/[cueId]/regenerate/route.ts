@@ -48,6 +48,8 @@ export async function POST(
       await mkdir(project.abs("broll"), { recursive: true });
       await writeFile(project.abs(rel), bytes);
       cue.imagePath = rel;
+      delete cue.videoPath;
+      delete cue.sourceUrl;
       await clearStages(project, ["compose", "render"]);
       await project.save();
       return Response.json({ ...projectSummary(s), cue, imageUrl: `/api/media/${safe}/${rel}` });
@@ -75,6 +77,8 @@ export async function POST(
       outputPath: outPath,
     });
     cue.imagePath = rel;
+    delete cue.videoPath;
+    delete cue.sourceUrl;
     if (prior && prior !== rel && prior.startsWith("broll/") && !prior.startsWith("broll/upload-")) await rm(project.abs(prior), { force: true });
 
     await clearStages(project, ["compose", "render"]);
