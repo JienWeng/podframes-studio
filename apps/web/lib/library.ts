@@ -27,6 +27,9 @@ export interface SavedCast {
   host: Host;
   createdAt: string;
   portraitUrl: string;
+  portraitFile?: string;
+  updatedAt?: string;
+  revision?: string;
 }
 export interface SavedSeries {
   id: string;
@@ -52,7 +55,7 @@ async function saveRecord(
 ) {
   const dir = join(libraryRoot(root), kind);
   await mkdir(dir, { recursive: true });
-  const temporary = join(dir, `${record.id}.tmp`);
+  const temporary = join(dir, `${record.id}.${randomUUID()}.tmp`);
   await writeFile(temporary, JSON.stringify(record, null, 2));
   await rename(temporary, join(dir, `${record.id}.json`));
 }
@@ -134,6 +137,70 @@ export async function saveCast(
     throw error;
   }
   return record;
+}
+
+export async function readCastPortrait(
+  entry: SavedCast,
+  root = findRepoRoot(),
+): Promise<Uint8Array> {
+  const filename = entry.portraitFile ?? `${libraryId(entry.id)}.image`;
+  if (!/^[a-f0-9-]+\.image$/.test(filename))
+    throw new Error("Invalid portrait file.");
+  return readFile(join(libraryRoot(root), "cast", filename));
+}
+
+export async function updateCast(
+  id: string,
+  host: Pick<
+    Host,
+    "name" | "model" | "voice" | "appearance" | "persona" | "defaultStyle"
+  >,
+  expectedVersion: string,
+  bytes?: Uint8Array,
+  root = findRepoRoot(),
+): Promise<SavedCast> {
+  libraryId(id);
+  if (bytes) brollUploadExtension(bytes);
+  return withProjectLock(
+    `cast-${id}`,
+    async () => {
+      const previous = await readCast(id, root);
+      if (
+        (previous.revision ?? previous.updatedAt ?? previous.createdAt) !==
+        expectedVersion
+      )
+        throw new Error(
+          "Cast changed since you opened it. Reload and edit the latest version.",
+        );
+      const version = randomUUID();
+      const portraitFile = bytes
+        ? `${id}-${version}.image`
+        : previous.portraitFile;
+      const record: SavedCast = {
+        ...previous,
+        name: host.name,
+        host: { ...previous.host, ...host },
+        updatedAt: new Date().toISOString(),
+        revision: version,
+        ...(portraitFile ? { portraitFile } : {}),
+        ...(bytes
+          ? { portraitUrl: `/api/library/cast/${id}/portrait?v=${version}` }
+          : {}),
+      };
+      const portrait = bytes
+        ? join(libraryRoot(root), "cast", portraitFile!)
+        : undefined;
+      if (portrait) await writeFile(portrait, bytes!);
+      try {
+        await saveRecord("cast", record, root);
+      } catch (error) {
+        if (portrait) await rm(portrait, { force: true });
+        throw error;
+      }
+      return record;
+    },
+    root,
+  );
 }
 
 export async function saveProjectCast(
@@ -233,11 +300,9 @@ export async function applySavedCast(
   const entry = await readCast(id, project.root);
   const target = project.state.config.hosts.find((host) => host.id === hostId);
   if (!target) throw new Error("Host not found.");
-  const bytes = await readFile(
-    join(libraryRoot(project.root), "cast", `${libraryId(id)}.image`),
-  );
+  const bytes = await readCastPortrait(entry, project.root);
   const extension = brollUploadExtension(bytes);
-  const relative = `assets/cast/${id}.${extension}`;
+  const relative = `assets/cast/${id}${entry.revision ? `-${entry.revision}` : ""}.${extension}`;
   await mkdir(project.abs("assets/cast"), { recursive: true });
   await writeFile(project.abs(relative), bytes);
   const host = {

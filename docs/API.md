@@ -60,7 +60,7 @@ Every POST to `/api/v1/` requires an `Idempotency-Key` with 16–128 letters, di
 | POST | `/projects/{slug}/cast` | Upload/generate a portrait or apply a saved cast member |
 | POST | `/projects/{slug}/script/delivery` | Propose delivery cues |
 | POST | `/voice-preview` | Generate a voice preview using provider credits |
-| GET, POST | `/library` | Read Cast/Series, save a host, create a series, or start an episode |
+| GET, POST, PATCH | `/library` | Read Cast/Series, save or edit a host, create a series, or start an episode |
 | GET | `/library/cast/{id}/portrait` | Read a saved portrait |
 | GET | `/media/{slug}/{path}` | Download project media, including byte-range requests |
 
@@ -105,3 +105,5 @@ Project creation returns a fresh slug for every new idempotency key. Replaying a
 ## Model-catalog references
 
 The connection check follows the provider model-list endpoints. [OpenAI model list](https://developers.openai.com/api/reference/resources/models/methods/list) and [Anthropic model list](https://platform.claude.com/docs/en/api/models/list).
+
+Saved cast can be edited with multipart `PATCH /api/v1/library`. Supply `id`, `version` (the saved `revision`, falling back to `updatedAt` or `createdAt` for older records), `name`, `model`, `voice`, `style`, `persona`, and `appearance`. A `portrait` file is optional. A stale version returns HTTP 409. Updates keep the cast ID and apply when the character is reused. Existing episode copies and series snapshots retain their saved settings until explicitly changed.

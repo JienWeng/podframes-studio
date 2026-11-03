@@ -20,6 +20,7 @@ export function LibraryHome({
 }) {
   const [library, setLibrary] = useState(initial);
   const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<SavedCast | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const templates = projects.filter((project) => project.templateReady);
@@ -30,7 +31,7 @@ export function LibraryHome({
     try {
       const form = body instanceof FormData;
       const response = await fetch("/api/library", {
-        method: "POST",
+        method: form && editing ? "PATCH" : "POST",
         ...(form
           ? { body }
           : {
@@ -53,6 +54,7 @@ export function LibraryHome({
         );
       setLibrary(await refreshed.json());
       setAdding(false);
+      setEditing(null);
     } catch (error) {
       setError(error instanceof Error ? error.message : "Could not save.");
     } finally {
@@ -89,7 +91,11 @@ export function LibraryHome({
             </p>
           </div>
           <button
-            onClick={() => setAdding(!adding)}
+            onClick={() => {
+              setEditing(null);
+              setAdding(!adding);
+              setError("");
+            }}
             disabled={busy}
             aria-expanded={adding}
             className="btn btn-primary px-5 py-2 text-sm"
@@ -111,18 +117,44 @@ export function LibraryHome({
         )}
         {adding && (
           <form
+            key={editing?.id ?? "new"}
             onSubmit={save}
             className="studio-editor mb-8 max-w-3xl space-y-5 p-5 sm:p-7"
           >
             <h2 className="text-2xl font-bold">
-              {section === "cast" ? "Add a cast member" : "Create a series"}
+              {section === "cast"
+                ? editing
+                  ? `Edit ${editing.name}`
+                  : "Add a cast member"
+                : "Create a series"}
             </h2>
             {section === "cast" ? (
               <>
+                {editing && (
+                  <>
+                    <input type="hidden" name="id" value={editing.id} />
+                    <input
+                      type="hidden"
+                      name="version"
+                      value={
+                        editing.revision ??
+                        editing.updatedAt ??
+                        editing.createdAt
+                      }
+                    />
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={editing.portraitUrl}
+                      alt={`${editing.name} current portrait`}
+                      className="h-48 w-36 rounded-xl object-cover"
+                    />
+                  </>
+                )}
                 <label className="block text-sm font-medium">
                   Name
                   <input
                     name="name"
+                    defaultValue={editing?.host.name ?? ""}
                     required
                     maxLength={80}
                     className={`${inputClass} mt-2`}
@@ -133,19 +165,24 @@ export function LibraryHome({
                   <input
                     name="portrait"
                     type="file"
-                    required
+                    required={!editing}
                     accept="image/png,image/jpeg,image/webp"
                     className={`${inputClass} mt-2`}
                   />
                   <span className="mt-1 block text-xs text-[var(--color-text-muted)]">
                     PNG, JPEG, or WebP up to 10 MB. You can also save a
                     generated host from any video&apos;s Cast &amp; voice step.
+                    {editing && " Choose a file to replace this portrait."}
                   </span>
                 </label>
                 <div className="grid gap-5 sm:grid-cols-2">
                   <label className="block text-sm font-medium">
                     Speech model
-                    <select name="model" defaultValue="fish/drama-3" className={`${inputClass} mt-2`}>
+                    <select
+                      name="model"
+                      defaultValue={editing?.host.model ?? "fish/drama-3"}
+                      className={`${inputClass} mt-2`}
+                    >
                       <option value="fish/s2.1-pro">S2.1 Pro</option>
                       <option value="fish/drama-3">Drama 3</option>
                     </select>
@@ -154,6 +191,7 @@ export function LibraryHome({
                     Fish voice ID
                     <input
                       name="voice"
+                      defaultValue={editing?.host.voice ?? ""}
                       required
                       maxLength={128}
                       pattern="[a-zA-Z0-9_-]+"
@@ -166,6 +204,7 @@ export function LibraryHome({
                   Delivery style
                   <input
                     name="style"
+                    defaultValue={editing?.host.defaultStyle ?? ""}
                     maxLength={500}
                     className={`${inputClass} mt-2`}
                     placeholder="Warm, curious, lightly playful"
@@ -175,6 +214,7 @@ export function LibraryHome({
                   Personality
                   <textarea
                     name="persona"
+                    defaultValue={editing?.host.persona ?? ""}
                     maxLength={2000}
                     rows={2}
                     className={`${inputClass} mt-2`}
@@ -185,6 +225,7 @@ export function LibraryHome({
                   Appearance notes
                   <textarea
                     name="appearance"
+                    defaultValue={editing?.host.appearance ?? ""}
                     maxLength={2000}
                     rows={2}
                     className={`${inputClass} mt-2`}
@@ -251,12 +292,18 @@ export function LibraryHome({
                 {busy
                   ? "Saving…"
                   : section === "cast"
-                    ? "Save cast member"
+                    ? editing
+                      ? "Save changes"
+                      : "Save cast member"
                     : "Create series"}
               </button>
               <button
                 type="button"
-                onClick={() => setAdding(false)}
+                onClick={() => {
+                  setAdding(false);
+                  setEditing(null);
+                  setError("");
+                }}
                 disabled={busy}
                 className="btn btn-ghost px-4 py-2 text-sm"
               >
@@ -292,6 +339,19 @@ export function LibraryHome({
                         cast.host.persona ||
                         "Ready for your next conversation."}
                     </p>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => {
+                        setEditing(cast);
+                        setAdding(true);
+                        setError("");
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                      className="btn btn-ghost w-full px-4 py-2 text-sm disabled:opacity-50"
+                    >
+                      Edit character & portrait
+                    </button>
                     <button
                       disabled={busy}
                       onClick={() =>

@@ -12,6 +12,8 @@ import {
   applySavedCast,
   createSeries,
   createSeriesEpisode,
+  updateCast,
+  readCastPortrait,
 } from "./library";
 
 const portrait = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 0]);
@@ -109,22 +111,129 @@ test("series retains independent template assets after the source video is remov
   assert.equal((await listLibrary(root)).series[0].id, series.id);
 });
 
+test("editing saved cast keeps its ID, validates revisions and replaces portraits atomically", async (t) => {
+  const { root, project } = await fixture();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const entry = await saveCast(project.state.config.hosts[0], portrait, root);
+  await applySavedCast(project, entry.id, "host_a");
+  const originalPath = project.state.uploads!.host_a!;
+  const host = {
+    ...entry.host,
+    name: "Updated character",
+    model: "fish/s2.1-pro",
+    defaultStyle: "deadpan",
+  };
+  const changed = await updateCast(
+    entry.id,
+    host,
+    entry.createdAt,
+    undefined,
+    root,
+  );
+  assert.equal(changed.id, entry.id);
+  assert.equal((await listLibrary(root)).cast.length, 1);
+  assert.deepEqual(new Uint8Array(await readCastPortrait(changed, root)), portrait);
+  await assert.rejects(
+    updateCast(entry.id, host, entry.createdAt, undefined, root),
+    /Cast changed/,
+  );
+  await assert.rejects(
+    updateCast(entry.id, host, changed.revision!, new Uint8Array([1, 2]), root),
+    /PNG/,
+  );
+  assert.equal((await readCast(entry.id, root)).revision, changed.revision);
+  const replacement = new Uint8Array([...portrait, 1]);
+  const updated = await updateCast(
+    entry.id,
+    host,
+    changed.revision!,
+    replacement,
+    root,
+  );
+  assert.notEqual(updated.portraitUrl, entry.portraitUrl);
+  assert.deepEqual(new Uint8Array(await readCastPortrait(updated, root)), replacement);
+  assert.deepEqual(
+    new Uint8Array(await readFile(project.abs(originalPath))),
+    portrait,
+  );
+  await applySavedCast(project, entry.id, "host_a");
+  assert.notEqual(project.state.uploads!.host_a, originalPath);
+  assert.deepEqual(
+    new Uint8Array(await readFile(project.abs(project.state.uploads!.host_a!))),
+    replacement,
+  );
+});
+
+test("cast edit API accepts metadata without another portrait and rejects stale forms", async (t) => {
+  const { root, project } = await fixture();
+  const cwd = process.cwd();
+  await writeFile(join(root, "pnpm-workspace.yaml"), "packages: []");
+  process.chdir(root);
+  t.after(async () => {
+    process.chdir(cwd);
+    await rm(root, { recursive: true, force: true });
+  });
+  const entry = await saveCast(project.state.config.hosts[0], portrait, root);
+  const { PATCH } = await import("../app/api/library/route");
+  const request = () => {
+    const form = new FormData();
+    for (const [key, value] of Object.entries({
+      id: entry.id,
+      version: entry.createdAt,
+      name: "Edited",
+      model: "fish/drama-3",
+      voice: entry.host.voice,
+      style: "dry humour",
+    }))
+      form.set(key, value);
+    return new Request("http://localhost/api/library", {
+      method: "PATCH",
+      body: form,
+    });
+  };
+  const result = await PATCH(request());
+  assert.equal(result.status, 200);
+  assert.equal((await result.json()).host.defaultStyle, "dry humour");
+  assert.equal((await PATCH(request())).status, 409);
+});
+
 test("library API saves existing cast and starts linked series episodes", async (t) => {
   const { root, project } = await fixture();
   const previous = process.cwd();
   await writeFile(join(root, "pnpm-workspace.yaml"), "packages: []");
   process.chdir(root);
-  t.after(async () => { process.chdir(previous); await rm(root, { recursive: true, force: true }); });
+  t.after(async () => {
+    process.chdir(previous);
+    await rm(root, { recursive: true, force: true });
+  });
   const { POST } = await import("../app/api/library/route");
-  const request = (body: unknown) => new Request("http://localhost/api/library", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  const saved = await POST(request({ kind: "cast", slug: project.slug, hostId: "host_a" }));
+  const request = (body: unknown) =>
+    new Request("http://localhost/api/library", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  const saved = await POST(
+    request({ kind: "cast", slug: project.slug, hostId: "host_a" }),
+  );
   assert.equal(saved.status, 201);
   assert.equal((await saved.json()).host.model, "fish/drama-3");
-  const created = await POST(request({ kind: "series", title: "API show", description: "", template: project.slug }));
+  const created = await POST(
+    request({
+      kind: "series",
+      title: "API show",
+      description: "",
+      template: project.slug,
+    }),
+  );
   assert.equal(created.status, 201);
   const series = await created.json();
   const episode = await POST(request({ kind: "episode", seriesId: series.id }));
   assert.equal(episode.status, 201);
   assert.equal((await episode.json()).seriesId, series.id);
-  assert.equal((await POST(request({ kind: "episode", seriesId: "../../private" }))).status, 400);
+  assert.equal(
+    (await POST(request({ kind: "episode", seriesId: "../../private" })))
+      .status,
+    400,
+  );
 });
