@@ -84,6 +84,113 @@ An external research/writing agent can save a new Markdown file and run that com
 
 Codex uses your existing ChatGPT login, with an isolated temporary workspace per request. API-key environment variables are removed from its subprocess environment. There is no automatic fallback to paid OpenAI API generation. Built-in image availability and subscription limits apply; unsupported sessions fail clearly.
 
+## Technical architecture
+
+Studio and the automation API enqueue full pipeline runs for a separate local worker. The CLI calls the same core pipeline directly. The web server and worker share this repository's filesystem; the cloud deployment described in the [deployment proposal](docs/DEPLOYMENT.md) is not the current runtime.
+
+```mermaid
+flowchart TB
+  subgraph entry["Entry points"]
+    studio["Studio browser<br/>Cast, script, edits, preview"]
+    agent["External automation client<br/>Bearer token + Idempotency-Key"]
+    cli["Local CLI<br/>pnpm podframes generate"]
+  end
+
+  subgraph local["Local machine · Node.js 22.13+ · shared repository"]
+    subgraph web["Next.js web process · apps/web"]
+      api["HTTP routes<br/>Owner authentication, input validation<br/>Request receipts and generation limits"]
+      stream["Run events endpoint<br/>Poll persisted events every second<br/>Stream SSE to browser/client"]
+      media["Media endpoint<br/>Serve project files with byte ranges"]
+    end
+    db[(".automation/state.sqlite<br/>Job queue, events, receipts<br/>Worker heartbeat and request budgets")]
+    worker["Local worker · pnpm worker<br/>Claim one pipeline job at a time<br/>Heartbeat + cooperative cancellation"]
+    core["Shared core pipeline<br/>generate / generateProject<br/>Project locks, preflight, stage selection<br/>Resume cache and edit invalidation"]
+
+    subgraph stages["Ordered stages · packages/core/src/stages"]
+      script["1 · script<br/>Research and validate structured dialogue<br/>Or accept validated imported dialogue"]
+      speech["2 · speech<br/>Fish synthesis per turn<br/>Whisper word alignment<br/>Audio segments + master timeline"]
+      stills["3 · stills<br/>Reuse roster/upload/template portraits<br/>Or generate host images"]
+      video["4 · video<br/>Portrait + actual audio per segment<br/>Bounded parallel lip-sync jobs"]
+      broll["5 · broll<br/>Plan timed images and graphic cues<br/>Reuse, generate, or select stock media"]
+      compose["6 · compose<br/>Apply trims, remap cues, group captions<br/>Build HTML composition + linked media"]
+      render["7 · render<br/>HyperFrames browser capture<br/>ffmpeg MP4 normalization / scaling"]
+      script --> speech --> stills --> video --> broll --> compose --> render
+    end
+
+    writer["WritingClient<br/>Selected script / cue model<br/>Structured output + research evidence checks"]
+    codex["Local Codex CLI<br/>ChatGPT session, isolated temp workspace<br/>Writing, built-in images, Fish MCP access"]
+    tools["Local media tools<br/>whisper.cpp + multilingual model<br/>ffmpeg / ffprobe · HyperFrames"]
+    files[("projects/&lt;slug&gt;/<br/>project.json + stage artifacts<br/>Audio, alignment, portraits, clips, cues<br/>composition/index.html + output.mp4")]
+    library["Reusable inputs<br/>Cast / series library and show templates<br/>Script reference examples + user uploads"]
+  end
+
+  subgraph remote["External services · selected credentials and credits"]
+    writers["Optional writers<br/>Claude Code subscription<br/>OpenAI API / Anthropic API"]
+    research["Live web sources<br/>Search + retrieved pages<br/>Cited URLs must have retrieval evidence"]
+    fish["Fish Audio MCP<br/>OAuth website credits<br/>Credit/text checks + speech generation"]
+    avatars["Selected lip-sync provider<br/>Replicate P-Video / fal LTX-2.3<br/>HeyGen CLI: subscription or API"]
+    stock["Pexels<br/>Optional stock B-roll"]
+  end
+
+  studio -->|"Studio HTTP APIs"| api
+  agent -->|"/api/v1/*"| api
+  api -->|"Enqueue / cancel; persist receipts"| db
+  db -->|"Claim queued job"| worker
+  worker -->|"generateProject"| core
+  cli -->|"generate"| core
+  core -->|"Execute selected stages in order"| script
+  core <-->|"Load and save state; reuse completed artifacts"| files
+  worker -->|"Persist progress and completion"| db
+  db -->|"Read sequenced job events"| stream
+  stream -->|"SSE progress"| studio
+  stream -->|"SSE progress"| agent
+  files --> media
+  media -->|"Preview / download"| studio
+  media -->|"Authenticated download"| agent
+  library -->|"Copied assets and reference context"| core
+
+  script -.->|"Drafting / research"| writer
+  broll -.->|"Cue planning"| writer
+  compose -.->|"Optional quote-sticker direction"| writer
+  writer -->|"Default writer + all image generation"| codex
+  writer -->|"Explicit alternate writer"| writers
+  codex -->|"Research tools"| research
+  writers -->|"Research tools"| research
+  speech -.->|"Restricted speech subprocess"| codex
+  codex -->|"Authenticated MCP tools"| fish
+  stills -.->|"Generate image if needed"| codex
+  broll -.->|"Generated images / stickers"| codex
+  broll -.->|"Optional stock selection"| stock
+  video -.->|"Submit, poll, download"| avatars
+  speech -.-> tools
+  compose -.-> tools
+  render -.-> tools
+  render -->|"Final MP4 + output metadata"| files
+```
+
+Solid arrows show execution, delivery, or persistence; dotted arrows show stage dependencies. Shared services and storage appear once. The stage chain is execution order: each stage also reads the earlier artifacts it needs from project state. Within speech and video, bounded worker pools process turns or segments concurrently.
+
+### Execution and artifact contracts
+
+| Boundary | Technical behavior | Implementation |
+| --- | --- | --- |
+| HTTP admission | Authenticates the owner, validates requests, applies generation limits, and records idempotent versioned POST responses. Full pipeline requests return after queueing; they do not keep an HTTP request open for the render. Preview and editing actions have their own routes. | [API contract](docs/API.md), [run admission](apps/web/lib/runs.ts), [versioned routes](apps/web/app/api/v1/\[...path\]/route.ts) |
+| Queue and worker | SQLite transactions coordinate web and worker processes. The worker claims one pipeline job at a time, persists progress, and checks cancellation between stages and inside worker pools. CLI runs bypass the HTTP queue and request budget, but share project locks. | [Queue](packages/core/src/automation.ts), [durable storage](packages/core/src/util/durable.ts), [worker](scripts/worker.mts), [CLI](apps/cli/src/index.ts) |
+| Pipeline coordinator | Validates config, loads environment, checks required tools and credentials before stage execution, selects `from` / `to` / `only`, and saves running/done/error state. Completed stages with recorded artifacts are skipped on ordinary resumes. | [Pipeline](packages/core/src/pipeline.ts), [project state](packages/core/src/project.ts), [locks](packages/core/src/util/lock.ts) |
+| Dialogue | Topic drafting uses the selected writer, script examples, and live research. Structured results must pass schema and source-evidence checks. Imported speaker-labelled text bypasses drafting; delivery direction preserves spoken dialogue. | [Script stage](packages/core/src/stages/script.ts), [writer adapter](packages/core/src/clients/writing.ts), [import parser](packages/core/src/script-import.ts), [delivery](packages/core/src/delivery.ts) |
+| Speech and timing | Fish returns purchased audio; its URL is cached before download/alignment. Local Whisper measures word timestamps against that audio. ffmpeg splits segments, inserts turn pauses, and assembles master audio; timing feeds captions and subsequent animation. | [Speech stage](packages/core/src/stages/speech.ts), [Fish client](packages/core/src/clients/fish.ts), [Whisper client](packages/core/src/clients/whisper.ts) |
+| Portraits and animation | Portraits are reused or generated once per host. Each animation unit pairs the host portrait with its actual speech segment. The selected provider returns a downloaded clip; HeyGen remote job IDs persist for interrupted-job recovery. | [Stills](packages/core/src/stages/stills.ts), [video dispatch and pools](packages/core/src/stages/video.ts), [HeyGen client](packages/core/src/clients/heygen.ts) |
+| Supporting visuals | Plans timed B-roll, statistics, quotes, and lower-thirds from the dialogue/timeline. Images can come from Codex, saved episode assets, or uploads; stock footage can come from Pexels. Uploaded/direct-link footage is supported through editing routes. The default AI-image path does not generate video footage. | [B-roll stage](packages/core/src/stages/broll.ts), [stock client](packages/core/src/clients/pexels.ts), [footage handling](packages/core/src/clients/footage.ts) |
+| Composition and export | Trims audio/video consistently, remaps cue timing, groups word captions, and links media/fonts into an HTML composition. HyperFrames captures the browser composition with one render worker; ffmpeg removes the empty leading MP4 edit, optionally downscales, and produces `output.mp4`. | [Compose](packages/core/src/stages/compose.ts), [HTML builder](packages/core/src/compose/builder.ts), [render](packages/core/src/stages/render.ts) |
+
+### Resume, edits, and billing boundaries
+
+`projects/<slug>/project.json` is the episode's resume source of truth; media and per-turn/provider caches live beside it. The queue database tracks jobs and request receipts separately. Cross-process project locks and optimistic save checks prevent CLI, worker, and editing routes from silently overwriting the same episode.
+
+Edits invalidate their dependent outputs through the [shared invalidation rules](packages/core/src/shared.ts) and [editing helpers](packages/core/src/editing.ts). For example, changed imported dialogue clears speech, video, B-roll, composition, and render while retaining host portraits. Presentation-only changes can reuse generated media and rebuild composition/render. `force` deliberately clears selected stage caches. A [show template](packages/core/src/show-template.ts) copies reusable portraits and images into independent episode files rather than inheriting old audio or lip-sync clips.
+
+Writing can use an explicitly selected subscription or API connection; images and Fish website-credit speech still require local Codex. Subscription subprocesses strip API credentials from their environment. Provider/billing modes do not silently switch after failures. Uncertain Fish calls are not automatically repeated, and interrupted or failed worker jobs require review and explicit acknowledgement before retrying. Cancellation stops further cooperative work; it cannot refund completed remote generation. See [authentication, limits, and recovery](docs/API.md) and the [episode automation guide](docs/AUTOMATION.md).
+
 ## Language
 
 Choose **Language** in **Cast & voice** before generating. English is the default; the picker includes Malay, Mandarin Chinese, Tamil, Indonesian, Japanese, Korean, Spanish, French, German, Hindi, Arabic, Thai, and Vietnamese. The selection is saved with the studio draft and used for new script dialogue, default voice-preview text, Fish speech, Whisper decoding, and b-roll labels. An existing script keeps its text until you click **rewrite**. Voice accent and delivery still depend on the chosen Fish voice.
