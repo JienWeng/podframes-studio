@@ -48,7 +48,7 @@ export async function runRender(ctx: StageContext): Promise<void> {
   const compDir = project.abs(composition.dir);
   const outPath = project.path("output.mp4");
   const { cmd, prefix } = resolveHyperframes(project.root);
-  const env = { ...process.env, PRODUCER_BROWSER_GPU_MODE: "hardware" };
+  const env = { ...process.env, PRODUCER_BROWSER_GPU_MODE: process.env.PRODUCER_BROWSER_GPU_MODE ?? "hardware" };
 
   // Lint (non-fatal: surface issues but still attempt the render). Skipped for
   // draft renders — that's the fast iteration loop.

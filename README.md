@@ -6,6 +6,8 @@ The existing Podframes studio flow and visual design stay intact. Choose **P-Vid
 
 ## Setup
 
+For a repeatable Ubuntu 24.04 VM or macOS installation, follow the **[complete setup guide](docs/SETUP.md)**. Run `bash scripts/setup.sh` from a checkout to install dependencies and build; finish account logins, then use `bash scripts/setup.sh services` for background web/worker services. Both processes run on the same machine.
+
 Requires Node 22+, pnpm, ffmpeg/ffprobe, the local Codex CLI, and whisper.cpp with a multilingual model.
 
 ```sh
@@ -36,6 +38,8 @@ Choose a video provider. API credentials can go in the project root’s `.env.lo
 ```sh
 pnpm podframes doctor
 pnpm dev:web
+# In a second terminal, start the generation worker:
+pnpm worker
 # Open http://localhost:3000/studio
 ```
 

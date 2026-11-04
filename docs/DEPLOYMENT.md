@@ -1,5 +1,7 @@
 # Hosted studio with a Mac generation worker
 
+For the implemented single-machine Ubuntu VM or macOS setup, including installation and background services, use [SETUP.md](SETUP.md). This document describes a different, proposed distributed deployment.
+
 The local implementation now has whole-app owner authentication, a versioned automation API with durable request receipts, a SQLite queue, persisted job events, generation-operation limits, and a separate Mac worker started with `pnpm worker`. The worker and web process currently share one local filesystem. Codex, Claude Code, OpenAI API, and Anthropic API writers are selectable. See [API.md](API.md).
 
 The cloud architecture below remains a deployment proposal. Outbound cloud-to-Mac job transport, cloud asset synchronization, individual customer accounts, schedules, and a hosted automation hub still need implementation. The local worker separation alone does not enable the Railway layout below.
