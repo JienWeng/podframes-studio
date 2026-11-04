@@ -49,6 +49,8 @@ Run this app locally on the machine with the Codex and HeyGen sessions. A remote
 
 For the complete first-episode walkthrough, recurring automation commands, script format, character/image reuse, and failure recovery, see the [podcast automation guide](docs/AUTOMATION.md).
 
+For n8n, import the [seven-stage workflow](examples/n8n/podframes-seven-stages.json) and follow the [n8n setup guide](docs/N8N.md). It orchestrates the same backend stages, checks completion, supports existing-project resume, and downloads the final MP4.
+
 In Studio’s **Script** step, use **Generate full video** for a topic, or **Paste or import a script → Import & generate full video** for external dialogue. Both run through speech, avatars, lip-sync, B-roll, captions, and the final MP4 without stepping through each screen. The selected provider must already be authenticated; generation uses its credits. Completed stages are reused when you resume.
 
 Plain `.txt` is the simplest interchange format; `.md` accepts the same speaker-labelled dialogue, an optional `# Title`, and bold speaker labels. Use your cast names or `HOST_A` / `HOST_B`. Continuation lines belong to the preceding speaker. Fish delivery tags remain intact. Imports preserve wording and do not automatically fact-check claims.

@@ -275,4 +275,4 @@ Recheck old queued/interrupted jobs before starting a restored worker. A restore
 | Worker crashed during a paid stage | Inspect saved artifacts and provider job status. Use the existing explicit interrupted-job acknowledgement only after reconciling the remote outcome. |
 | Disk nearly full | Back up completed episodes and intentionally delete old projects through Studio. Do not delete in-progress caches or remote-job receipts. Rotate macOS log files while services are stopped. |
 
-For episode commands, reuse, and recovery, see [automation](AUTOMATION.md). For owner authentication, limits, idempotency, and endpoints, see [API](API.md). The separate hosted-web/Mac-worker architecture remains a [future deployment proposal](DEPLOYMENT.md).
+For episode commands, reuse, and recovery, see [automation](AUTOMATION.md). For a visual automation alternative, import the [n8n seven-stage workflow](N8N.md). For owner authentication, limits, idempotency, and endpoints, see [API](API.md). The separate hosted-web/Mac-worker architecture remains a [future deployment proposal](DEPLOYMENT.md).

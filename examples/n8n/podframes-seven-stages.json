@@ -1,0 +1,588 @@
+{
+  "name": "Podframes - seven-stage episode pipeline",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "start",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Edit these non-secret settings. Store the owner token in an n8n Header Auth credential.\nconst settings = {\n  baseUrl: 'http://127.0.0.1:3000',\n  existingSlug: '', // Set to a saved project slug to resume; its saved config wins.\n  operationId: 'podframes-n8n-' + $execution.id,\n  pollSeconds: 70,\n  maxStageMinutes: 120,\n  config: {\n    topic: 'Why is the sky blue?',\n    language: 'en',\n    targetDurationSec: 60,\n    aspectRatio: '16:9',\n    hosts: [\n      { id: 'host_a', name: 'Ada', speaker: 'HOST_A', model: 'fish/drama-3',\n        voice: 'ca3007f96ae7499ab87d27ea3599956a', side: 'left',\n        persona: 'Warm, curious lead host',\n        appearance: 'East Asian woman in her early 30s, straight black shoulder-length hair, olive blazer over a white tee' },\n      { id: 'host_b', name: 'Theo', speaker: 'HOST_B', model: 'fish/drama-3',\n        voice: '9a9cf47702da476aa4629e2506d4a857', side: 'right',\n        persona: 'Lively co-host who grounds the discussion in specifics',\n        appearance: 'Man in his late 30s, light stubble, glasses, charcoal henley' }\n    ],\n    options: { videoProvider: 'replicate-p-video', heygenAuth: 'subscription' }\n  }\n};\nsettings.baseUrl = settings.baseUrl.replace(/\\/+$/, '');\nif (!/^https?:\\/\\/[^\\s?#]+$/.test(settings.baseUrl)) throw new Error('Set a reachable HTTP(S) baseUrl without query or fragment.');\nif (!/^[A-Za-z0-9._-]{16,100}$/.test(settings.operationId)) throw new Error('operationId needs 16-100 letters, digits, dots, underscores or hyphens.');\nif (settings.existingSlug && !/^[a-z0-9][a-z0-9-]*$/i.test(settings.existingSlug)) throw new Error('Invalid existing project slug.');\nif (!Number.isInteger(settings.pollSeconds) || settings.pollSeconds < 1 || settings.pollSeconds > 3600) throw new Error('pollSeconds must be 1-3600.');\nif (!Number.isInteger(settings.maxStageMinutes) || settings.maxStageMinutes < 1 || settings.maxStageMinutes > 180) throw new Error('maxStageMinutes must be 1-180.');\nreturn [{ json: settings }];"
+      },
+      "id": "episode-settings",
+      "name": "Episode settings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "condition",
+              "leftValue": "={{ Boolean($json.existingSlug) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "resume-existing-episode-",
+      "name": "Resume existing episode?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.baseUrl + '/api/v1/projects/' + $json.existingSlug }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 120000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "load-episode",
+      "name": "Load episode",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        100
+      ],
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.baseUrl + '/api/v1/projects' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 120000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ config: $json.config }) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $json.operationId + '-create' }}"
+            }
+          ]
+        }
+      },
+      "id": "create-episode",
+      "name": "Create episode",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        320
+      ],
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "jsCode": "const project = $input.first().json;\nconst settings = $('Episode settings').first().json;\nif (!project.slug || !/^[a-z0-9][a-z0-9-]*$/i.test(project.slug)) throw new Error('API returned no valid project slug.');\nif (project.runActive) throw new Error('This project already has an active run. Inspect Studio before starting another.');\nreturn [{ json: { ...settings, slug: project.slug, options: project.options } }];"
+      },
+      "id": "prepare-episode",
+      "name": "Prepare episode",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.baseUrl + '/api/v1/health' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 120000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "check-backend",
+      "name": "Check backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        200
+      ],
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "jsCode": "const health = $input.first().json;\nconst episode = $('Prepare episode').first().json;\nconst required = ['automation', 'worker', 'codex', 'fish', 'whisper', 'ffmpeg'];\nif (episode.options.videoProvider === 'replicate-p-video') required.push('replicate');\nif (episode.options.videoProvider === 'fal-ltx') required.push('fal');\nif (episode.options.videoProvider === 'heygen' && episode.options.heygenAuth !== 'api') required.push('heygen');\nconst missing = required.filter(name => health[name] !== true);\nif (missing.length) throw new Error('Backend not ready: ' + missing.join(', ') + '. Run doctor on the backend machine.');\nreturn ['script', 'speech', 'stills', 'video', 'broll', 'compose', 'render'].map(stage => ({\n  json: { baseUrl: episode.baseUrl, slug: episode.slug, operationId: episode.operationId,\n    pollSeconds: episode.pollSeconds, maxStageMinutes: episode.maxStageMinutes, stage },\n  pairedItem: { item: 0 }\n}));"
+      },
+      "id": "plan-seven-stages",
+      "name": "Plan seven stages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "one-stage-at-a-time",
+      "name": "One stage at a time",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1540,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nreturn [{ json: { ...item, deadline: Date.now() + item.maxStageMinutes * 60000 } }];"
+      },
+      "id": "begin-stage",
+      "name": "Begin stage",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.baseUrl + '/api/v1/generate' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 120000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ slug: $json.slug, only: [$json.stage], force: false }) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $json.operationId + '-' + $json.stage }}"
+            }
+          ]
+        }
+      },
+      "id": "enqueue-stage",
+      "name": "Enqueue stage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1980,
+        340
+      ],
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": "={{ $('Begin stage').item.json.pollSeconds }}",
+        "unit": "seconds"
+      },
+      "id": "wait-before-polling",
+      "name": "Wait before polling",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2200,
+        340
+      ],
+      "webhookId": "podframes-stage-wait"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Begin stage').item.json.baseUrl + '/api/v1/projects/' + $('Begin stage').item.json.slug }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 120000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "read-project-status",
+      "name": "Read project status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2420,
+        340
+      ],
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "jsCode": "const context = $('Begin stage').item.json;\nconst project = $input.first().json;\nif (project.slug !== context.slug || typeof project.runActive !== 'boolean') throw new Error('Unexpected project status response.');\nconst status = project.stages?.[context.stage];\nconst complete = project.runActive === false && status === 'done';\nif (!project.runActive && !complete) {\n  const reason = project.stageErrors?.[context.stage] || status || 'stage never started';\n  throw new Error(context.stage + ' stopped: ' + reason + '. Inspect backend/provider state; no automatic retry.');\n}\nif (!complete && Date.now() >= context.deadline) throw new Error(context.stage + ' polling timed out. The backend job may still be running; inspect it before retrying.');\nreturn [{ json: { ...context, complete, status, videoUrl: project.videoUrl ?? null } }];"
+      },
+      "id": "check-stage-result",
+      "name": "Check stage result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "condition",
+              "leftValue": "={{ $json.complete }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "stage-complete-",
+      "name": "Stage complete?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2860,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(item => item.json);\nconst result = items.find(item => item.stage === 'render');\nif (!result?.complete || !result.videoUrl) throw new Error('Render finished without a video URL. Inspect project state.');\nconst prefix = '/api/media/' + result.slug + '/';\nif (!result.videoUrl.startsWith(prefix)) throw new Error('Unexpected media URL; refusing to forward credentials.');\nreturn [{ json: {\n  slug: result.slug, stages: items.map(item => ({ stage: item.stage, status: item.status })),\n  studioUrl: result.baseUrl + '/studio',\n  downloadUrl: result.baseUrl + result.videoUrl.replace('/api/media/', '/api/v1/media/')\n} }];"
+      },
+      "id": "episode-ready",
+      "name": "Episode ready",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.downloadUrl }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 300000,
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "video"
+            }
+          }
+        }
+      },
+      "id": "download-mp4",
+      "name": "Download MP4",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1980,
+        0
+      ],
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "content": "## Podframes · seven-stage API mirror\n1. Read docs/N8N.md before executing (generation spends provider credits).\n2. Edit Episode settings; choose a new topic or existingSlug.\n3. Bind the same Header Auth credential to all SIX HTTP Request nodes:\n   Authorization: Bearer <PODFRAMES_API_TOKEN>\n4. Backend web + worker must be reachable and authenticated.\n\nscript → speech → stills → video → broll → compose → render\n\nOne shared loop submits only one stage at a time. Never auto-retry paid POSTs.\nNo secrets included. Backend owns media, provider sessions, caches, and rendering.",
+        "height": 390,
+        "width": 620
+      },
+      "id": "setup-and-stage-map",
+      "name": "Setup and stage map",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -300
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Episode settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Episode settings": {
+      "main": [
+        [
+          {
+            "node": "Resume existing episode?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resume existing episode?": {
+      "main": [
+        [
+          {
+            "node": "Load episode",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create episode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load episode": {
+      "main": [
+        [
+          {
+            "node": "Prepare episode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create episode": {
+      "main": [
+        [
+          {
+            "node": "Prepare episode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare episode": {
+      "main": [
+        [
+          {
+            "node": "Check backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check backend": {
+      "main": [
+        [
+          {
+            "node": "Plan seven stages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan seven stages": {
+      "main": [
+        [
+          {
+            "node": "One stage at a time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "One stage at a time": {
+      "main": [
+        [
+          {
+            "node": "Episode ready",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Begin stage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Begin stage": {
+      "main": [
+        [
+          {
+            "node": "Enqueue stage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enqueue stage": {
+      "main": [
+        [
+          {
+            "node": "Wait before polling",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait before polling": {
+      "main": [
+        [
+          {
+            "node": "Read project status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read project status": {
+      "main": [
+        [
+          {
+            "node": "Check stage result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check stage result": {
+      "main": [
+        [
+          {
+            "node": "Stage complete?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stage complete?": {
+      "main": [
+        [
+          {
+            "node": "One stage at a time",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait before polling",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Episode ready": {
+      "main": [
+        [
+          {
+            "node": "Download MP4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "executionTimeout": 86400
+  },
+  "tags": []
+}
