@@ -1,5 +1,6 @@
 "use client";
 
+import { SetupStatus } from "../SetupStatus";
 import { StudioSidebar } from "./StudioSidebar";
 import { useState } from "react";
 import { deleteProject, createFromTemplate } from "@/components/studio/api";
@@ -55,12 +56,14 @@ export function ProjectsHome({ projects: initial }: { projects: ProjectSummary[]
         </div>
         <a href="/studio?new=1" className="btn btn-primary px-4 py-2 text-sm">+ New video</a>
       </div>
+      <SetupStatus />
       {projects.length > 0 && <p className="mb-4 text-sm text-[var(--color-text-secondary)]">Use a video as a template to keep its characters, voices, and styling for a new episode.</p>}
       {templateError && <p role="alert" className="mb-4 text-sm text-[var(--color-danger)]">{templateError}</p>}
 
       {projects.length === 0 ? (
         <div className="border border-dashed border-[var(--color-hairline)] py-16 text-center">
-          <p className="text-sm text-[var(--color-text-secondary)]">No videos yet.</p>
+          <p className="text-lg font-semibold">Create your first episode</p>
+          <p className="mx-auto mt-2 max-w-md text-sm text-[var(--color-text-secondary)]">Choose your cast, write or paste a script, then generate voices and video. Save the finished setup as a series to reuse it.</p>
           <a href="/studio?new=1" className="btn btn-primary mt-4 px-4 py-2 text-sm">Start your first</a>
         </div>
       ) : (
@@ -94,10 +97,10 @@ export function ProjectsHome({ projects: initial }: { projects: ProjectSummary[]
                 </div>
               </a>
               <div className="border-t border-[var(--color-hairline)] px-3 py-2">
-                <button onClick={() => createEpisode(p.slug)} disabled={busy !== null || !p.templateReady} className="btn btn-ghost w-full py-1.5 text-xs disabled:opacity-40" title={p.templateReady ? "Copy characters, voices, style, and reusable imagery into a new episode" : "Save both host portraits in Cast & voice first"}>
+                <button onClick={() => createEpisode(p.slug)} disabled={busy !== null || !p.templateReady} className="btn btn-ghost w-full py-1.5 text-xs disabled:opacity-40" title={p.templateReady ? "Copy characters, voices, style, and reusable imagery into a new episode" : "Save all selected host portraits in Cast & voice first"}>
                   {busy === p.slug && confirm !== p.slug ? "Creating episode…" : "Use as template"}
                 </button>
-                {!p.templateReady && <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">Save both host portraits first.</p>}
+                {!p.templateReady && <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">Save all selected host portraits first.</p>}
               </div>
 
               <button

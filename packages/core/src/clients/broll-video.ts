@@ -2,10 +2,18 @@ import { createHash } from "node:crypto";
 import { createFalClient } from "@fal-ai/client";
 import { readJson, writeJson } from "../util/fs";
 
-const MODEL = "fal-ai/ltx-2.3/text-to-video";
+const MODELS = { "ltx-pro": "fal-ai/ltx-2.3/text-to-video", "ltx-fast": "fal-ai/ltx-2.3/text-to-video/fast", "h3-max-turbo": "minimax/h3-max-turbo/text-to-video" } as const;
+export type BrollVideoModel = keyof typeof MODELS;
+
+export function brollVideoStateFile(cueId: string, prompt: string, aspectRatio: string, model: BrollVideoModel = "ltx-pro"): string {
+  // Preserve existing Pro request paths so interrupted jobs resume without another purchase.
+  const inputs = model === "ltx-pro" ? [cueId, prompt, aspectRatio] : [cueId, prompt, aspectRatio, model];
+  return `${createHash("sha256").update(JSON.stringify(inputs)).digest("hex")}.json`;
+}
 
 interface BrollVideoArgs {
   apiKey: string;
+  model?: BrollVideoModel;
   prompt: string;
   aspectRatio: "9:16" | "16:9";
   statePath: string;
@@ -43,8 +51,12 @@ export async function pollBrollVideo(args: BrollVideoArgs): Promise<{ status: "p
   if (typeof args.apiKey !== "string" || !args.apiKey.trim()) throw new Error("FAL_API_KEY is required for b-roll video generation.");
   if (typeof args.prompt !== "string" || !args.prompt.trim() || args.prompt.trim().length > 2000) throw new Error("B-roll video prompt must contain 1–2000 characters.");
   if (args.aspectRatio !== "9:16" && args.aspectRatio !== "16:9") throw new Error("B-roll video aspect ratio must be 9:16 or 16:9.");
+  const model = args.model ?? "ltx-pro";
+  if (!Object.hasOwn(MODELS, model)) throw new Error("Choose h3-max-turbo, ltx-fast or ltx-pro for B-roll video.");
+  // SDK endpoint types still declare string enums; the current provider schema requires numbers.
+  const endpoint: string = MODELS[model];
   const prompt = args.prompt.trim();
-  const key = createHash("sha256").update(JSON.stringify([MODEL, prompt, args.aspectRatio])).digest("hex");
+  const key = createHash("sha256").update(JSON.stringify([endpoint, prompt, args.aspectRatio])).digest("hex");
   let state = await readJson<BrollVideoState>(args.statePath).catch((error: NodeJS.ErrnoException) => {
     if (error.code === "ENOENT") return undefined;
     throw error;
@@ -66,13 +78,19 @@ export async function pollBrollVideo(args: BrollVideoArgs): Promise<{ status: "p
       try {
         const response = await fetch(input, { ...init, signal });
         if (!response.ok) {
-          await response.body?.cancel();
-          throw new Error(`B-roll queue request failed with HTTP ${response.status}.`);
+          const payload: unknown = await response.json().catch(() => null);
+          const details = payload && typeof payload === "object" && "detail" in payload ? payload.detail : undefined;
+          const allowedFields = new Set(["prompt", "duration", "resolution", "fps", "aspect_ratio", "generate_audio", "enable_safety_checker", "prompt_expansion_mode"]);
+          const validation = Array.isArray(details) ? details.flatMap((item: { loc?: unknown; type?: unknown }) => {
+            const fields = Array.isArray(item?.loc) ? item.loc.filter((field: unknown) => typeof field === "string" && allowedFields.has(field)) : [];
+            return fields.length ? [fields.join(".")] : [];
+          }).slice(0, 8).join(", ") : "";
+          throw new Error(`B-roll queue request failed with HTTP ${response.status}.${validation ? ` Check input fields: ${validation}.` : ""}`);
         }
         const body = await response.text();
         return new Response(body, { status: response.status, headers: response.headers });
       } catch (error) {
-        const http = error instanceof Error && /^B-roll queue request failed with HTTP \d+\.$/.test(error.message) ? error.message : "B-roll queue connection failed. Poll the saved request again.";
+        const http = error instanceof Error && /^B-roll queue request failed with HTTP \d+\./.test(error.message) ? error.message : "B-roll queue connection failed. Poll the saved request again.";
         throw new Error(http);
       }
     },
@@ -81,8 +99,10 @@ export async function pollBrollVideo(args: BrollVideoArgs): Promise<{ status: "p
   if (!state) {
     state = { key, status: "submitting" };
     await writeJson(args.statePath, state);
-    const input = Object.freeze({ prompt, aspect_ratio: args.aspectRatio, duration: "6", resolution: "1080p", fps: "25", generate_audio: false, enable_safety_checker: true });
-    const submitted = await client.queue.submit(MODEL, {
+    const input = Object.freeze(model === "h3-max-turbo"
+      ? { prompt, aspect_ratio: args.aspectRatio, duration: 6, resolution: "768P", prompt_expansion_mode: "disabled", enable_safety_checker: true }
+      : { prompt, aspect_ratio: args.aspectRatio, duration: 6, resolution: "1080p", fps: 25, generate_audio: false, enable_safety_checker: true });
+    const submitted = await client.queue.submit(endpoint, {
       input,
       abortSignal: signal,
     });
@@ -90,10 +110,10 @@ export async function pollBrollVideo(args: BrollVideoArgs): Promise<{ status: "p
     await writeJson(args.statePath, state);
   }
   const requestId = checkedRequestId(state.requestId);
-  const status = await client.queue.status(MODEL, { requestId, abortSignal: signal });
+  const status = await client.queue.status(endpoint, { requestId, abortSignal: signal });
   if (status.status === "IN_QUEUE" || status.status === "IN_PROGRESS") return { status: "pending", requestId };
   if (status.status !== "COMPLETED") throw new Error("B-roll queue request failed. Review the saved request in fal provider history.");
-  const result = await client.queue.result(MODEL, { requestId, abortSignal: signal });
+  const result = await client.queue.result(endpoint, { requestId, abortSignal: signal });
   const url = trustedVideoUrl(result.data?.video?.url);
   await writeJson(args.statePath, { key, status: "completed", requestId, url } satisfies BrollVideoState);
   return { status: "completed", requestId, url };

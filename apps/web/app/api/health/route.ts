@@ -1,29 +1,30 @@
-import { resolveEnv, claudeStatus, codexStatus, fishStatus, whisperStatus, workerOnline } from "@podframes/core";
-import { heygenStatus } from "@podframes/core";
-import { exec } from "node:child_process";
+import { resolveEnv, claudeStatus, codexStatus, fishStatus, whisperStatus, workerOnline, heygenStatus } from "@podframes/core";
+import { execFile } from "node:child_process";
 import { findRepoRoot } from "@/lib/root";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-/** Which keys/binaries are configured — the studio header renders these as dots
- *  so misconfiguration is visible up-front, not one stage-failure at a time. */
+const hasBinary = (name: string) => new Promise<boolean>((resolve) => {
+  execFile(name, ["-version"], { timeout: 5000 }, (error) => resolve(!error));
+});
+
+/** Configuration probes only; provider credits and generation access are checked at run time. */
 export async function GET() {
-  const env = resolveEnv(findRepoRoot());
-  const ffmpeg = await new Promise<boolean>((resolve) => {
-    exec("ffmpeg -version", (err) => resolve(!err));
-  });
+  const root = findRepoRoot();
+  const env = resolveEnv(root);
+  const [fish, whisper, codex, claude, heygen, ffmpeg, ffprobe] = await Promise.all([
+    fishStatus(), whisperStatus(), codexStatus(), claudeStatus(), heygenStatus("subscription"), hasBinary("ffmpeg"), hasBinary("ffprobe"),
+  ]);
   return Response.json({
-    fish: await fishStatus(),
-    whisper: await whisperStatus(),
-    codex: await codexStatus(),
-    claude: await claudeStatus(),
+    fish, whisper, codex, claude, heygen, ffmpeg, ffprobe,
     openai: !!process.env.OPENAI_API_KEY,
     anthropic: !!process.env.ANTHROPIC_API_KEY,
     automation: (process.env.PODFRAMES_API_TOKEN?.length ?? 0) >= 32,
-    worker: workerOnline(findRepoRoot()),
-    heygen: await heygenStatus("subscription"),
+    worker: workerOnline(root),
+    heygenApi: !!env.heygenApiKey,
     fal: !!env.falApiKey,
     replicate: !!env.replicateApiKey,
-    ffmpeg,
-  });
+    pexels: !!env.pexelsApiKey,
+  }, { headers: { "Cache-Control": "no-store" } });
 }

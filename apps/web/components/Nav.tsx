@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SessionControl } from "./SessionControl";
 import { SITE } from "@/lib/site";
 import { Wordmark } from "./Wordmark";
 
@@ -27,6 +28,7 @@ export function Nav() {
           >
             GitHub
           </a>
+          <SessionControl />
           <Link href="/studio" className="btn btn-primary ml-2 px-4 py-2 text-sm">
             Open studio →
           </Link>

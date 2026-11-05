@@ -22,6 +22,7 @@ import { Step3Look } from "./Step3Look";
 import { Step4Output } from "./Step4Output";
 import { StudioSidebar } from "./StudioSidebar";
 import { Preview } from "./Preview";
+import { SetupStatus } from "../SetupStatus";
 import { clearStudioDraft, readStudioDraft, writeStudioDraft } from "./draft-storage";
 
 const clamp = (lo: number, hi: number, n: number) => Math.max(lo, Math.min(hi, n));
@@ -38,46 +39,12 @@ function hostsKey(hosts: Array<ProjectDetail["config"]["hosts"][number]>): strin
       h.defaultStability,
       h.defaultStyle,
       h.flip,
+      h.speechSpeed,
     ]),
   );
 }
 
-const HEALTH_LABELS: Record<string, string> = {
-  worker: "Mac generation worker — run pnpm worker in a separate terminal",
-  fish: "Fish website login — speech uses website credits",
-  whisper: "Local Whisper — word timestamps without API charges",
-  codex: "Codex ChatGPT login — scripts and images",
-  heygen: "HeyGen subscription OAuth login (optional)",
-  replicate: "REPLICATE_API_KEY — the default lip-sync video provider",
-  ffmpeg: "ffmpeg on PATH — audio/video processing",
-};
-
 type ConfirmRequest = ConfirmOptions & { resolve: (ok: boolean) => void };
-
-/** Key/binary status dots — misconfiguration is visible up-front instead of one
- *  stage-failure at a time. Hover a dot for what it unlocks. */
-function HealthDots() {
-  const [health, setHealth] = useState<Record<string, boolean> | null>(null);
-  useEffect(() => {
-    fetch("/api/health")
-      .then((r) => (r.ok ? r.json() : null))
-      .then(setHealth)
-      .catch(() => {});
-  }, []);
-  if (!health) return null;
-  return (
-    <div className="hidden items-center gap-1.5 sm:flex" aria-label="Environment status">
-      {Object.entries(HEALTH_LABELS).map(([key, label]) => (
-        <span
-          key={key}
-          title={`${label} — ${health[key] ? "configured" : "MISSING"}`}
-          className="h-1.5 w-1.5 rounded-full"
-          style={{ background: health[key] ? "var(--color-success)" : "var(--color-danger)" }}
-        />
-      ))}
-    </div>
-  );
-}
 
 export function Wizard({ initial, initialStep }: { initial: ProjectDetail | null; initialStep?: number }) {
   const [project, setProject] = useState<ProjectDetail | null>(initial);
@@ -358,7 +325,6 @@ export function Wizard({ initial, initialStep }: { initial: ProjectDetail | null
           </div>
           <div className="flex shrink-0 items-center gap-3">
             {project?.seriesId && <a href="/studio/series" className="text-xs font-semibold text-[var(--color-accent)]">Series ↗</a>}
-            <HealthDots />
             <span className="mono border border-[var(--color-hairline)] px-1.5 py-0.5 text-[10px] text-[var(--color-text-muted)]">
               {aspect} · {project?.options?.videoResolution ?? resolution}
             </span>
@@ -464,6 +430,7 @@ export function Wizard({ initial, initialStep }: { initial: ProjectDetail | null
           <div className="studio-body grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(260px,30%)]">
             <main className="studio-editor scroll-thin min-w-0 min-h-0">
               <div className="mx-auto w-full max-w-3xl px-5 py-7 sm:px-7">
+                <SetupStatus videoProvider={project?.options.videoProvider ?? "replicate-p-video"} heygenAuth={project?.options.heygenAuth} />
                 <StepBody />
               </div>
             </main>

@@ -4,6 +4,8 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CodexClient } from "./codex";
+import { run } from "../util/proc";
+import { probeDuration } from "../util/audio";
 import { extForMediaType, synthesizeOne } from "./fish";
 
 const args = { model: "fish/s2.1-pro", voice: "voice-reference", text: "Hello world" };
@@ -113,4 +115,26 @@ test("corrupt cached speech does not silently buy a replacement", async (t) => {
   const generation = t.mock.method(CodexClient.prototype, "generateStructured", async () => { throw new Error("unexpected call"); });
   await assert.rejects(synthesizeOne({ ...args, cachePath }), SyntaxError);
   assert.equal(generation.mock.callCount(), 0);
+});
+
+
+test("speed changes reuse purchased speech and shorten audio before alignment", async (t) => {
+  const dir = await mkdtemp(join(tmpdir(), "podframes-fish-speed-"));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const input = join(dir, "original.mp3");
+  await run("ffmpeg", ["-y", "-f", "lavfi", "-i", "sine=frequency=440:duration=3", input]);
+  const bytes = new Uint8Array(await readFile(input));
+  const generation = t.mock.method(CodexClient.prototype, "generateStructured", async () => ({ audioUrls: [url], error: "" }));
+  t.mock.method(globalThis, "fetch", async () => new Response(bytes, { headers: { "content-type": "audio/mpeg" } }));
+  const request = { ...args, cachePath: join(dir, "speech.json") };
+  for (const speed of [1, 1.1, 1.25]) {
+    const result = await synthesizeOne({ ...request, speechSpeed: speed });
+    const path = join(dir, `speed-${speed}.mp3`);
+    await writeFile(path, result.audio);
+    assert.ok(Math.abs(await probeDuration(path) - 3 / speed) < 0.1);
+  }
+  assert.equal(generation.mock.callCount(), 1);
+  await assert.rejects(synthesizeOne({ ...request, speechSpeed: 0 }), /Speech speed/);
+  await assert.rejects(synthesizeOne({ ...request, speechSpeed: NaN }), /Speech speed/);
+  assert.equal(generation.mock.callCount(), 1);
 });

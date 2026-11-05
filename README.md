@@ -4,9 +4,15 @@ Turn a topic into a two-host podcast video: local Codex writes the script and ge
 
 The existing Podframes studio flow and visual design stay intact. Choose **P-Video Avatar**, **LTX-2.3**, or **HeyGen** for per-turn lip-sync.
 
+For installation, automation, service readiness, and operational guides, see the [documentation index](docs/README.md).
+
 ## Setup
 
-For a repeatable Ubuntu 24.04 VM or macOS installation, follow the **[complete setup guide](docs/SETUP.md)**. Run `bash scripts/setup.sh` from a checkout to install dependencies and build; finish account logins, then use `bash scripts/setup.sh services` for background web/worker services. Both processes run on the same machine.
+For colleagues sharing this host, see [private team access](docs/TEAM.md). Owners approve members; editors generate with shared credits.
+
+For a production URL on your server, follow [production hosting](docs/PRODUCTION.md), or invoke `$podframes-deploy` in this checkout.
+
+For a repeatable Ubuntu 24.04 VM or macOS installation, follow the **[complete setup guide](docs/SETUP.md)**. Run `bash scripts/setup.sh` from a checkout to install dependencies and build; finish account logins, run `pnpm podframes doctor` and `bash scripts/run-service.sh check`, then use `bash scripts/setup.sh services` for background web/worker services. Both processes run on the same machine.
 
 Requires Node 22+, pnpm, ffmpeg/ffprobe, the local Codex CLI, and whisper.cpp with a multilingual model.
 
@@ -253,6 +259,38 @@ pnpm podframes --help
 ```
 
 Projects remain under `projects/<slug>/`. Existing completed media is retained. For older Speechbase projects, choose Fish Audio and valid Fish reference IDs for both hosts before regenerating speech; old provider voice IDs are not interchangeable.
+
+## Codex skill installation and use
+
+The producer skill is included in the checkout at [`.agents/skills/podframes-producer/SKILL.md`](.agents/skills/podframes-producer/SKILL.md). Load it from the Podframes project:
+
+1. Open the `podframes` repository folder as your project in Codex.
+2. Start a new chat in that project so repository skills can be discovered.
+3. Type `$podframes-producer` followed by your request. Select the skill from the skill picker when available.
+4. Follow the brief questions, review the scripts and generation settings, and approve the specific episode or batch before paid media generation.
+
+If the skill is absent from the picker, verify that the file exists in your checkout and reopen the Podframes project in a fresh chat. For a session that already has file access, explicitly ask it to read `.agents/skills/podframes-producer/SKILL.md` and follow its linked workflow. A chat opened in a different repository needs the Podframes project context or an explicit path to this file.
+
+The workflow includes visual decisions alongside drafting and approvals:
+
+| Spoken moment | Visual treatment |
+| --- | --- |
+| Short, faithful punchline or memorable reaction | A brief quote card, ideally within 12 Chinese characters or 6 English words |
+| A concrete named action such as 写文案 or 做 video | Relevant sticker-only artwork, such as pen and paper or a clapperboard, timed for 1–2.5 seconds |
+| A factual claim, historical date, or evidence | Matching source material, a factual label, or clearly illustrative footage |
+| A serious or sensitive passage | Restrained supporting graphics |
+
+The agent reuses relevant assets, proposes new stickers when needed, and keeps graphics sparse. Review frames for overlap with faces and captions because placement currently uses fixed safe zones.
+
+### Agent-assisted production
+
+To direct the existing Mac worker from your phone or another paired device, follow [remote Codex setup](docs/REMOTE_CODEX.md).
+
+In a Codex session opened in this repository, invoke `$podframes-producer` to prepare a single episode or batch, select saved cast/series, review the exact script and settings, and approve paid generation before the worker starts it. The [repository skill](.agents/skills/podframes-producer/SKILL.md) loads the [production workflow](apps/web/public/agent-guide.md).
+
+Example prompt: `$podframes-producer Draft three Mandarin episodes from my saved series. Ask missing questions one at a time and show all scripts before I approve generation.`
+
+The running app serves discovery pointers at `/llms.txt` and the workflow at `/agent-guide.md`, under the app's existing authentication rules. Clients must choose to read these resources. Approval is an agent workflow convention; API generation endpoints execute authorized requests directly.
 
 ## Development
 

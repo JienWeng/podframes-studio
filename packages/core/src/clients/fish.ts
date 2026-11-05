@@ -15,6 +15,8 @@ export interface FishSpeechArgs {
   voice: string;
   text: string;
   language?: string;
+  /** Local pitch-preserving tempo, applied before alignment and lip sync. */
+  speechSpeed?: number;
   providerOptions?: Record<string, unknown>;
   signal?: AbortSignal;
   /** Keep generated URLs so download/alignment retries do not buy speech again. */
@@ -37,6 +39,7 @@ export function validateFishSpeech(args: FishSpeechArgs): string {
   if (typeof args.voice !== "string" || !args.voice.trim()) throw new Error("Fish Audio voice reference ID is required");
   if (typeof args.text !== "string" || !args.text.trim()) throw new Error("Fish Audio text must not be empty");
   if (args.language != null && !isLanguageCode(args.language)) throw new Error("Invalid Fish language code");
+  if (args.speechSpeed != null && !(Number.isFinite(args.speechSpeed) && args.speechSpeed >= 0.75 && args.speechSpeed <= 1.5)) throw new Error("Speech speed must be 0.75–1.5");
   if (args.providerOptions && Object.keys(args.providerOptions).length) {
     throw new Error("Fish website-credit mode supports inline audio tags; developer API provider options are unavailable");
   }
@@ -114,7 +117,8 @@ export async function synthesizeOne(args: FishSpeechArgs): Promise<{ audio: Uint
     if (!audio.length) throw new Error("Fish MCP returned empty audio");
     clips.push({ audio, mediaType: response.headers.get("content-type")?.split(";")[0] ?? "audio/mpeg" });
   }
-  if (clips.length === 1) return clips[0]!;
+  const speed = args.speechSpeed ?? 1;
+  if (clips.length === 1 && speed === 1) return clips[0]!;
   const dir = await mkdtemp(join(tmpdir(), "podframes-fish-"));
   try {
     const paths = [];
@@ -123,8 +127,16 @@ export async function synthesizeOne(args: FishSpeechArgs): Promise<{ audio: Uint
       await writeFile(path, clips[i]!.audio);
       paths.push(path);
     }
-    const output = join(dir, "combined.mp3");
-    await concatAudio(paths, output);
+    let output = paths[0]!;
+    if (paths.length > 1) {
+      output = join(dir, "combined.mp3");
+      await concatAudio(paths, output);
+    }
+    if (speed !== 1) {
+      const adjusted = join(dir, "speed.mp3");
+      await run("ffmpeg", ["-y", "-i", output, "-af", `atempo=${speed}`, "-c:a", "libmp3lame", "-q:a", "2", adjusted], { signal: args.signal });
+      output = adjusted;
+    }
     return { audio: new Uint8Array(await readFile(output)), mediaType: "audio/mpeg" };
   } finally {
     await rm(dir, { recursive: true, force: true });

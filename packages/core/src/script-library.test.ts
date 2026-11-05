@@ -25,3 +25,18 @@ test("script library uses language-specific excerpts, English fallback, and fres
   await writeFile(join(dir, "zh-01.md"), "x".repeat(6001));
   await assert.rejects(loadScriptExamples(root, "zh"), /too long/);
 });
+
+
+test("source-led profile is opt-in and stays inside the four-reference budget", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "podframes-profile-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const dir = join(root, "examples/script-library");
+  await mkdir(dir, { recursive: true });
+  await writeFile(join(dir, "profile-source-led-explainer.md"), "SOURCE_PROFILE");
+  for (let i = 1; i <= 4; i++) await writeFile(join(dir, `zh-0${i}.md`), `REFERENCE_${i}`);
+  assert.doesNotMatch(await loadScriptExamples(root, "zh"), /SOURCE_PROFILE/);
+  const selected = await loadScriptExamples(root, "zh", "Source-led explainer with clear delivery");
+  assert.match(selected, /SOURCE_PROFILE/);
+  assert.match(selected, /REFERENCE_3/);
+  assert.doesNotMatch(selected, /REFERENCE_4/);
+});

@@ -278,6 +278,11 @@ export function LibraryHome({
                   </label>
                 </div>
                 <label className="block text-sm font-medium">
+                  Speech speed
+                  <input name="speechSpeed" type="number" min={0.75} max={1.5} step={0.01} defaultValue={editing?.host.speechSpeed ?? 1} required className={`${inputClass} mt-2`} />
+                  <span className="mt-1 block text-xs text-[var(--muted)]">1× normal · 1.1× brisk · 1.25× fast. Saved for future videos.</span>
+                </label>
+                <label className="block text-sm font-medium">
                   Delivery style
                   <input
                     name="style"
@@ -366,14 +371,14 @@ export function LibraryHome({
                   </select>
                 </label>
                 <p className="text-sm text-[var(--color-text-muted)]">
-                  Copies both characters, voices, speech models, captions, video
+                  Copies the selected cast, voices, speech models, captions, video
                   settings, and reusable imagery. New episodes get their own
                   script and media.
                 </p>
                 {!templates.length && (
                   <p className="text-sm text-[var(--color-warn)]">
-                    Save both host portraits in a video first, then return here
-                    to use it as your show template.
+                    Save all selected host portraits in a video first, then return here
+                    to use it as your show template. <a href="/studio?new=1" className="underline">Create a video →</a>
                   </p>
                 )}
               </>

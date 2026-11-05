@@ -15,11 +15,11 @@ pnpm dev:web          # run the studio at http://localhost:3000
 ```
 
 The repo is a pnpm monorepo: `packages/core` (pipeline engine), `apps/cli` (headless runner),
-`apps/web` (Next.js studio). `design.md` at the root is the brand truth for both the web app and
-the rendered video — read it before touching UI or composition code.
+`apps/web` (Next.js studio). [the web design brief](docs/internal/design.md) describes the studio interface; exported video
+artwork has its own tokens in `packages/core/src/shared.ts`. Read the relevant spec before editing.
 
 Before opening a PR: `pnpm typecheck` and `pnpm test` must pass, and changes should match
-`design.md`.
+[the web design brief](docs/internal/design.md).
 
 ## Design philosophy
 
@@ -35,8 +35,9 @@ These are house rules, not suggestions:
 ## Agent skills
 
 Agent skills used during development are pinned in `skills-lock.json` (source repo + path +
-content hash) and fetched locally into `.agents/`, which is gitignored. If you change which skills
-the repo uses, update `skills-lock.json` — never commit `.agents/` itself.
+content hash). Downloaded third-party skills remain ignored. The first-party
+[Podframes producer skill](.agents/skills/podframes-producer/SKILL.md) is versioned with this repo.
+If you change downloaded skills, update `skills-lock.json`.
 
 ## Security
 

@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
-import { pollBrollVideo } from "./broll-video";
+import { pollBrollVideo, brollVideoStateFile } from "./broll-video";
 
 async function fixture(t: TestContext) {
   const dir = await mkdtemp(join(tmpdir(), "podframes-broll-video-"));
@@ -33,7 +33,7 @@ test("submits fixed safe input once, checks once, resumes and caches the complet
   assert.equal(calls.length, count);
   assert.equal(calls.filter((call) => call.init?.method === "POST").length, 1);
   assert.deepEqual(JSON.parse(calls[0]!.init!.body as string), {
-    prompt: args.prompt, aspect_ratio: "16:9", duration: "6", resolution: "1080p", fps: "25", generate_audio: false, enable_safety_checker: true,
+    prompt: args.prompt, aspect_ratio: "16:9", duration: 6, resolution: "1080p", fps: 25, generate_audio: false, enable_safety_checker: true,
   });
   assert.equal(new Headers(calls[0]!.init?.headers).get("authorization"), `Key ${args.apiKey}`);
   assert.ok(calls[0]!.url.endsWith("/fal-ai/ltx-2.3/text-to-video"));
@@ -105,4 +105,64 @@ test("corrupt saved state fails closed before submitting a replacement", async (
     await assert.rejects(pollBrollVideo(args));
   }
   assert.equal(mock.mock.callCount(), 0);
+});
+
+
+test("Fast uses its verified endpoint and cannot reuse a Pro request", async (t) => {
+  const args = await fixture(t);
+  let submissions = 0;
+  t.mock.method(globalThis, "fetch", async (input: unknown, init?: RequestInit) => {
+    if (init?.method === "POST") {
+      submissions++;
+      assert.ok(String(input).endsWith("/fal-ai/ltx-2.3/text-to-video/fast"));
+      return Response.json({ request_id: "fast-request" });
+    }
+    return Response.json({ status: "IN_QUEUE" });
+  });
+  await pollBrollVideo({ ...args, model: "ltx-fast" });
+  await pollBrollVideo({ ...args, model: "ltx-fast" });
+  await assert.rejects(pollBrollVideo({ ...args, model: "ltx-pro" }), /different state path/);
+  assert.equal(submissions, 1);
+  assert.equal(brollVideoStateFile("cue", args.prompt, args.aspectRatio), brollVideoStateFile("cue", args.prompt, args.aspectRatio, "ltx-pro"));
+  assert.notEqual(brollVideoStateFile("cue", args.prompt, args.aspectRatio, "ltx-fast"), brollVideoStateFile("cue", args.prompt, args.aspectRatio));
+});
+
+
+test("validation errors identify safe field names without exposing provider input or secrets", async (t) => {
+  const args = await fixture(t);
+  t.mock.method(globalThis, "fetch", async () => Response.json({ detail: [
+    { loc: ["body", "fps"], type: "literal_error", msg: args.apiKey, input: args.apiKey },
+    { loc: ["body", "duration"], msg: "sensitive provider text" },
+    { loc: ["body", args.apiKey], msg: args.apiKey },
+  ] }, { status: 422 }));
+  await assert.rejects(pollBrollVideo(args), (error: unknown) => {
+    assert.ok(error instanceof Error);
+    assert.match(error.message, /HTTP 422.*fps, duration/);
+    assert.doesNotMatch(error.message, /test-fal-secret|sensitive provider text/);
+    return true;
+  });
+  await assert.rejects(pollBrollVideo(args), /outcome is unknown/);
+});
+
+
+test("MiniMax H3 Max Turbo uses its own schema and isolated resumable request", async (t) => {
+  const args = await fixture(t);
+  let submissions = 0;
+  t.mock.method(globalThis, "fetch", async (input: unknown, init?: RequestInit) => {
+    if (init?.method === "POST") {
+      submissions++;
+      assert.ok(String(input).endsWith("/minimax/h3-max-turbo/text-to-video"));
+      assert.deepEqual(JSON.parse(init.body as string), {
+        prompt: args.prompt, aspect_ratio: "16:9", duration: 6, resolution: "768P",
+        prompt_expansion_mode: "disabled", enable_safety_checker: true,
+      });
+      return Response.json({ request_id: "h3-request" });
+    }
+    return Response.json({ status: "IN_QUEUE" });
+  });
+  await pollBrollVideo({ ...args, model: "h3-max-turbo" });
+  await pollBrollVideo({ ...args, model: "h3-max-turbo" });
+  await assert.rejects(pollBrollVideo({ ...args, model: "ltx-fast" }), /different state path/);
+  assert.equal(submissions, 1);
+  assert.notEqual(brollVideoStateFile("cue", args.prompt, args.aspectRatio, "h3-max-turbo"), brollVideoStateFile("cue", args.prompt, args.aspectRatio, "ltx-fast"));
 });

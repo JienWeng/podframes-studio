@@ -1,6 +1,5 @@
-import { createHash } from "node:crypto";
 import { access } from "node:fs/promises";
-import { Project, pollBrollVideo, resolveEnv, withProjectLock } from "@podframes/core";
+import { Project, pollBrollVideo, brollVideoStateFile, resolveEnv, withProjectLock } from "@podframes/core";
 import { findRepoRoot, safeSlug } from "@/lib/root";
 import { isRunActiveAnywhere } from "@/lib/runs";
 import { POST as importFootage } from "../footage/route";
@@ -28,8 +27,8 @@ async function handle(request: Request, context: Context): Promise<Response> {
       const prompt = cue.imagePrompt?.trim();
       if (!prompt || prompt.length > 2000) return new Response("Save a video prompt of 1–2000 characters before generating.", { status: 400 });
       const aspectRatio = project.state.config.aspectRatio ?? "16:9";
-      const hash = createHash("sha256").update(JSON.stringify([cue.id, prompt, aspectRatio])).digest("hex");
-      const statePath = project.path(".broll-video", `${hash}.json`);
+      const model = project.state.options.brollVideoModel ?? "ltx-pro";
+      const statePath = project.path(".broll-video", brollVideoStateFile(cue.id, prompt, aspectRatio, model));
       if (request.method === "GET") {
         const exists = await access(statePath).then(() => true, (error: NodeJS.ErrnoException) => {
           if (error.code === "ENOENT") return false;
@@ -39,16 +38,16 @@ async function handle(request: Request, context: Context): Promise<Response> {
       }
       const apiKey = resolveEnv(root).falApiKey;
       if (!apiKey) return new Response("Set FAL_API_KEY on the server to generate AI b-roll video.", { status: 503 });
-      const job = await pollBrollVideo({ apiKey, prompt, aspectRatio, statePath });
+      const job = await pollBrollVideo({ apiKey, prompt, aspectRatio, statePath, model });
       if (job.status === "pending") return Response.json(job, { status: 202, headers: { "Cache-Control": "no-store" } });
-      return { ...job, expectedPrompt: prompt, expectedAspectRatio: aspectRatio };
+      return { ...job, expectedPrompt: prompt, expectedAspectRatio: aspectRatio, expectedBrollVideoModel: model };
     }, root);
     if (result instanceof Response) return result;
     // The footage importer takes its own project lock. Release the queue lock before calling it.
     const imported = await importFootage(new Request(request.url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url: result.url, expectedPrompt: result.expectedPrompt, expectedAspectRatio: result.expectedAspectRatio }),
+      body: JSON.stringify({ url: result.url, expectedPrompt: result.expectedPrompt, expectedAspectRatio: result.expectedAspectRatio, expectedBrollVideoModel: result.expectedBrollVideoModel }),
       signal: request.signal,
     }), { params: Promise.resolve({ slug: safe, cueId }) });
     if (!imported.ok) return imported;

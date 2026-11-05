@@ -44,6 +44,7 @@ export function castFromHosts(hosts: Host[]): CastChannel[] {
     side: h.side,
     model: h.model,
     voice: h.voice,
+    speechSpeed: h.speechSpeed,
     provider: providerOfModel(h.model),
     appearance: h.appearance ?? "",
     persona: h.persona,
@@ -65,7 +66,7 @@ export function configFrom(
   settings: { targetDurationSec?: number; autoEmotionTags?: boolean; sourceUrls?: string[] } = {},
 ): CreateConfig {
   return {
-    topic: topic.trim(),
+    topic: topic.trim() || "Untitled video",
     language,
     targetDurationSec: settings.targetDurationSec ?? 90,
     autoEmotionTags: settings.autoEmotionTags ?? true,

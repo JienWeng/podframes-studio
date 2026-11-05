@@ -68,7 +68,7 @@ export function Step1Cast() {
 
   return (
     <div>
-      <StepHeader title="Cast & voice" hint="Two hosts, each on its own voice. Click a face to pick a default or upload your own." />
+      <StepHeader title="Cast & voice" hint="Choose 1–6 speakers. Use saved cast below, or edit each portrait and voice." />
       {project?.templateSource && <p className="mb-4 border border-[var(--color-hairline)] p-3 text-xs text-[var(--color-text-secondary)]">Characters, voices, and styling copied from your template. {project.reusableImageCount} saved B-roll image{project.reusableImageCount === 1 ? "" : "s"} available for relevant moments. You can change either face below.</p>}
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -99,9 +99,24 @@ export function Step1Cast() {
           <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">Used for new scripts and voice previews. Rewrite an existing script to change its language.</p>
         </div>
         {cast.map((ch, i) => (
-          <HostEditor key={i} index={i} ch={ch} disabled={locked} onEditFace={() => setDialogIndex(i)} />
+          <div key={ch.id}>
+            <HostEditor index={i} ch={ch} disabled={locked || busy} onEditFace={() => setDialogIndex(i)} />
+            <button className="btn btn-ghost mt-2 text-xs" disabled={locked || busy || cast.length <= 1 || !!project?.script?.turns.some((turn) => turn.hostId === ch.id)} onClick={async () => {
+              const next = cast.filter((host) => host.id !== ch.id);
+              if (ctx.slug && !(await ctx.patch({ hosts: castToHosts(next) }))) return;
+              ctx.setCast(() => next);
+            }}>Remove {ch.name}</button>
+          </div>
         ))}
       </div>
+
+      <button className="btn btn-ghost mt-4" disabled={locked || busy || cast.length >= 6} onClick={async () => {
+        const letter = ["a", "b", "c", "d", "e", "f"].find((value) => !cast.some((host) => host.id === `host_${value}`));
+        if (!letter) return;
+        const next = [...cast, { ...cast[0], id: `host_${letter}`, name: `Speaker ${letter.toUpperCase()}`, side: "right" as const }];
+        if (ctx.slug && !(await ctx.patch({ hosts: castToHosts(next) }))) return;
+        ctx.setCast(() => next);
+      }}>+ Add speaker</button>
 
       <StepFooter>
         <button onClick={() => ctx.go(2)} disabled={locked} className="btn btn-primary px-5 py-2 text-sm disabled:opacity-50">Continue to Script →</button>
@@ -190,6 +205,7 @@ function HostEditor({ index, ch, disabled, onEditFace }: { index: number; ch: Ca
         language: ctx.language,
         model: ch.model,
         voice: ch.voice,
+        speechSpeed: ch.speechSpeed,
         stability: ch.stability,
         style: ch.style,
         ...(sampleText.trim() ? { text: sampleText.trim() } : {}),
@@ -255,6 +271,10 @@ function HostEditor({ index, ch, disabled, onEditFace }: { index: number; ch: Ca
             </select>
           </div>
           <label className="block text-xs font-medium text-[var(--color-text-secondary)]">
+            Speech speed
+            <select aria-label={`Speech speed for ${ch.name}`} value={ch.speechSpeed ?? 1} disabled={disabled} onChange={(event) => void updateVoice({ speechSpeed: Number(event.target.value) })} className={`${inputClass} mt-1 mb-3`}>
+              {[...new Set([0.75, 1, 1.1, 1.25, 1.5, ch.speechSpeed ?? 1])].sort((a,b) => a-b).map(speed => <option key={speed} value={speed}>{speed}×</option>)}
+            </select>
             Speech model
             <select aria-label={`Speech model for ${ch.name}`} value={ch.model} disabled={disabled} onChange={(event) => void updateVoice({ model: event.target.value })} className={`${inputClass} mt-1`}>
               {!provider?.models?.some((candidate) => candidate.id === ch.model) && <option value={ch.model} disabled>{ch.model} (saved model)</option>}

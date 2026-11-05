@@ -159,7 +159,7 @@ export async function updateCast(
   id: string,
   host: Pick<
     Host,
-    "name" | "model" | "voice" | "appearance" | "persona" | "defaultStyle"
+    "name" | "model" | "voice" | "appearance" | "persona" | "defaultStyle" | "speechSpeed"
   >,
   expectedVersion: string,
   bytes?: Uint8Array,
@@ -367,11 +367,9 @@ export async function applySavedCast(
     side: target.side,
     speaker: target.speaker,
   };
-  const [first, second] = project.state.config.hosts;
-  project.state.config.hosts = [
-    first.id === hostId ? host : first,
-    second.id === hostId ? host : second,
-  ];
+  project.state.config.hosts = project.state.config.hosts.map((current) =>
+    current.id === hostId ? host : current,
+  );
   project.state.uploads = { ...project.state.uploads, [hostId]: relative };
   await clearStages(project, [
     "speech",

@@ -55,7 +55,6 @@ test("configured token protects pages, APIs and static media", (t) => {
     "/studio",
     "/api/projects",
     "/api/media/private/file.mp4",
-    "/_next/static/app.js",
   ]) {
     const response = proxy(request(path));
     assert.equal(response.status, 401);
@@ -173,9 +172,14 @@ test("local-only opt-in rejects remote hosts, forwarding chains and inconsistent
   );
 });
 
-test("local-only opt-in cannot bypass configured owner authentication", (t) => {
+test("local-only opt-in permits direct Studio access while preserving remote and API authentication", (t) => {
   environment(t, token, "true");
-  assert.equal(proxy(request()).status, 401);
+  assert.equal(proxy(request()).headers.get("x-middleware-next"), "1");
+  assert.equal(proxy(request("/api/media/private/file.mp4")).headers.get("x-middleware-next"), "1");
+  assert.equal(proxy(request("/api/v1/health")).status, 401);
+  assert.equal(proxy(request("/studio", { "x-real-ip": "203.0.113.2" })).status, 401);
+  assert.equal(proxy(request("/studio", {}, "https://example.com")).status, 401);
+  assert.equal(proxy(request("/api/projects", {origin:"https://evil.example"}, undefined, "POST")).status, 403);
 });
 
 test("authenticated browser and bearer mutations reject cross-site and mismatched origins", (t) => {
@@ -260,4 +264,10 @@ test("local-only mutations also require same-origin browser requests", (t) => {
     ).headers.get("x-middleware-next"),
     "1",
   );
+});
+
+test("login page and bundled UI assets are public but private media remain protected", (t) => {
+  environment(t, token);
+  for (const path of ["/login", "/_next/static/app.js", "/api/auth/me"]) assert.equal(proxy(request(path)).headers.get("x-middleware-next"), "1");
+  assert.equal(proxy(request("/api/media/private/file.mp4")).status, 401);
 });

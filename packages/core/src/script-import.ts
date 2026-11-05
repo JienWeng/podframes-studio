@@ -14,15 +14,15 @@ export function validateManualScript(value: unknown, hosts: Pick<Host, "id">[]):
 /** A small text format, not a Markdown renderer: no prose is sent to a model. */
 export function parsePastedScript(input: string, hosts: Pick<Host, "id" | "name" | "speaker">[], topic = "Imported script"): Script {
   if (input.length > MAX_TEXT) throw new Error("Script must be under 50,000 characters.");
-  if (hosts.length !== 2) throw new Error("Choose two cast members first.");
+  if (hosts.length < 1 || hosts.length > 6) throw new Error("Choose 1–6 cast members first.");
   const speakers = new Map<string, typeof hosts[number] | null>();
   for (const host of hosts) {
     const name = host.name.trim().toLocaleLowerCase();
     speakers.set(name, speakers.has(name) ? null : host);
   }
-  hosts.forEach((host, index) => {
-    speakers.set(index === 0 ? "host_a" : "host_b", host);
-    speakers.set(index === 0 ? "a" : "b", host);
+  hosts.forEach((host) => {
+    speakers.set(host.speaker.toLocaleLowerCase(), host);
+    if (/^HOST_[A-F]$/i.test(host.speaker)) speakers.set(host.speaker.slice(-1).toLowerCase(), host);
   });
   const script: Script = { topic, title: topic, hook: "", turns: [] };
   const lines = input.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").split("\n");
@@ -37,7 +37,7 @@ export function parsePastedScript(input: string, hosts: Pick<Host, "id" | "name"
     const labelled = line.replace(/^[-*]\s+/, "").replace(/\*\*/g, "").match(/^([^:：]{1,80})[:：]\s*(.*)$/);
     if (labelled) {
       const host = speakers.get(labelled[1]!.trim().toLocaleLowerCase());
-      if (!host) throw new Error(`Line ${index + 1}: unknown or ambiguous speaker “${labelled[1]!.trim()}”. Use HOST_A or HOST_B.`);
+      if (!host) throw new Error(`Line ${index + 1}: unknown or ambiguous speaker “${labelled[1]!.trim()}”. Use a cast name or its HOST_A–HOST_F label.`);
       script.turns.push({ index: script.turns.length, hostId: host.id, speaker: host.speaker, text: labelled[2]! });
     } else {
       const turn = script.turns.at(-1);

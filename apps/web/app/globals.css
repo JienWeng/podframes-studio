@@ -337,3 +337,11 @@ body {
   .studio-sidebar { flex-wrap: wrap; }
   .studio-sidebar nav { width: 100%; justify-content: space-between; }
 }
+
+/* Account controls share the studio surface and spacing. */
+.studio-sidebar .session-control {
+  border-top: 1px solid var(--color-hairline);
+  padding-top: 1.25rem;
+}
+.team-workspace > form { max-width: 44rem; }
+.team-workspace .btn:disabled { opacity: 0.55; }

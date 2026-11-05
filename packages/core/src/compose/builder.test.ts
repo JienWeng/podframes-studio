@@ -88,6 +88,15 @@ test("buildComposition tiles already-trimmed clips on the shortened audio window
     captionStyle: "clean",
     captionColor: "#22D3EE",
   };
+  const panelHosts = ["a", "b", "c"].map((letter) => ({ ...input.hosts[0]!, id: `host_${letter}`, speaker: `HOST_${letter.toUpperCase()}`, name: `Host ${letter}` }));
+  const panel = buildComposition({
+    ...input,
+    durationSec: 11.7,
+    hosts: panelHosts,
+    clips: panelHosts.map((host, index) => ({ ...input.clips[0]!, id: `turn-${index}-0`, hostId: host.id, turnIndex: index, src: `media/clips/${host.id}.mp4` })),
+    turns: panelHosts.map((host, index) => ({ ...input.turns[0]!, hostId: host.id, speaker: host.speaker, turnIndex: index, start: index * 3.9, end: (index + 1) * 3.9 })),
+  });
+  for (const host of panelHosts) assert.ok(panel.includes(`src="media/clips/${host.id}.mp4"`));
   const html = buildComposition(input);
 
   assert.match(
@@ -175,6 +184,12 @@ test("buildComposition tiles already-trimmed clips on the shortened audio window
     footage,
     /<video id="test-footage-footage"[^>]*src="media\/broll\/clip.mp4"[^>]*muted[^>]*data-start="0.5"/,
   );
+  const footageWrapper = footage.match(/<div id="test-footage"[^>]*>/)?.[0];
+  assert.ok(footageWrapper);
+  assert.doesNotMatch(footageWrapper, /data-start|data-duration|class="clip/);
+  assert.match(footage, /id="test-footage-footage"[^>]*data-duration="1.5"/);
+  assert.match(footage, /tl\.set\('#test-footage', \{ opacity: 1 \}, 0\.5\)/);
+  assert.match(footage, /tl\.set\('#test-footage', \{ opacity: 0 \}, 2\)/);
   assert.doesNotMatch(footage, /id="test-graphic"|id="episode-open"/);
   const graphics = buildComposition({
     ...layered,

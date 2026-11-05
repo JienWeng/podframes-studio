@@ -21,6 +21,7 @@ export async function POST(req: Request) {
     model?: string;
     language?: string;
     voice?: string;
+    speechSpeed?: number;
     stability?: number;
     style?: string;
     text?: string;
@@ -34,6 +35,7 @@ export async function POST(req: Request) {
   if (!body.model || !body.voice) return new Response("model and voice are required", { status: 400 });
   if (body.language != null && !isLanguageCode(body.language)) return new Response("invalid language code", { status: 400 });
   const language = body.language ?? "en";
+  if (body.speechSpeed != null && !(Number.isFinite(body.speechSpeed) && body.speechSpeed >= 0.75 && body.speechSpeed <= 1.5)) return new Response("Speech speed must be 0.75–1.5", { status: 400 });
 
   // Reuse the performance compiler so the preview reflects the chosen voice settings.
   const host: Host = {
@@ -50,7 +52,8 @@ export async function POST(req: Request) {
   const turn: ScriptTurn = { index: 0, hostId: "preview", speaker: "PREVIEW", text: (body.text?.trim() || voicePreviewText(language)).slice(0, 240) };
   const compiled = compilePerformance(host, turn);
 
-  const cacheKey = JSON.stringify([body.model, body.voice, compiled.text, compiled.providerOptions ?? body.providerOptions ?? null, ...(language === "en" ? [] : [language])]);
+  const sourceKey = JSON.stringify([body.model, body.voice, compiled.text, compiled.providerOptions ?? body.providerOptions ?? null, ...(language === "en" ? [] : [language])]);
+  const cacheKey = JSON.stringify([sourceKey, body.speechSpeed ?? 1]);
   const hit = sampleCache.get(cacheKey);
   if (hit) {
     return new Response(new Uint8Array(hit.audio), {
@@ -63,10 +66,11 @@ export async function POST(req: Request) {
       model: body.model,
       language,
       voice: body.voice,
+      speechSpeed: body.speechSpeed,
       text: compiled.text,
       providerOptions: compiled.providerOptions ?? body.providerOptions,
       signal: req.signal,
-      cachePath: join(tmpdir(), "podframes-voice-previews", `${createHash("sha256").update(cacheKey).digest("hex")}.json`),
+      cachePath: join(tmpdir(), "podframes-voice-previews", `${createHash("sha256").update(sourceKey).digest("hex")}.json`),
     });
     const audio = Buffer.from(out.audio);
     sampleCache.set(cacheKey, { audio, mediaType: out.mediaType });

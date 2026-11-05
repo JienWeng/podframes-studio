@@ -56,6 +56,7 @@ export interface Host {
   /** Fish Audio synthesis options; older projects may retain legacy settings. */
   providerOptions?: Record<string, unknown>;
   /** Default ElevenLabs voice stability (0..1) for this host. Lower = more expressive/variable, higher = more consistent. */
+  speechSpeed?: number;
   defaultStability?: number;
   /**
    * Free-text voice direction. Emitted as an audio
@@ -86,7 +87,7 @@ export interface ConversationConfig {
   sourceUrls?: string[];
   /** Cap each turn's length (words). Low values (~12-16) make punchy short clips. */
   maxWordsPerTurn?: number;
-  hosts: [Host, Host];
+  hosts: Host[];
   language?: string;
   aspectRatio?: AspectRatio;
   /** Override pipeline model ids / quality knobs. */
@@ -131,12 +132,16 @@ export interface PipelineOptions {
   /** Automatically choose or generate relevant artwork for quote beats. */
   autoStickers?: boolean;
   /** Source used to fill newly planned B-roll beats. */
-  brollSource?: "images" | "pexels";
+  brollSource?: "images" | "pexels" | "ai-video";
+  /** fal text-to-video quality for supporting footage. */
+  brollVideoModel?: "ltx-fast" | "ltx-pro" | "h3-max-turbo";
   showGraphics: boolean;
   /** Hard ceiling on b-roll/overlay cues (the effective budget depends on visualTreatment). */
   maxCues: number;
   /** Final render quality. */
   renderQuality: "draft" | "standard" | "high";
+  /** Final MP4 playback speed, applied once to video and audio together. */
+  exportSpeed?: number;
   /** Final render fps. */
   fps: 24 | 30;
   /** Caption visual style. */

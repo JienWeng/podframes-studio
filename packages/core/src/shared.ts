@@ -212,6 +212,7 @@ export const INVALIDATION = {
   // Trim edits only affect how existing generated clips are assembled; the paid
   // lip-sync MP4s stay intact.
   clipTrim: ["compose", "render"],
+  exportSpeed: ["render"],
   // Resolution is baked into the base stills the animator conditions on AND every
   // generated clip, so 720p↔1080p re-animates everything (b-roll images are
   // resolution-independent squares and survive).
@@ -224,6 +225,7 @@ const OPTION_INVALIDATION = {
   showBroll: "visualTreatment",
   showGraphics: "visualTreatment",
   autoStickers: "visualTreatment",
+  exportSpeed: "exportSpeed",
   captionStyle: "captions",
   captionColor: "captions",
   visualTreatment: "visualTreatment",

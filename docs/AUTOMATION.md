@@ -243,3 +243,25 @@ Quote cards and stickers occupy separate layout slots. Preview and export share 
 ### Sticker-only action beats
 
 Automatic planning can illustrate concrete actions such as 写文案 or 做 video with a brief sticker-only beat, while retaining the normal spoken captions. The saved cue uses `type: "quote"` with `stickerOnly: true`; its `title` is the internal subject for selecting artwork and is omitted from the picture. The director uses literal action artwork instead of a generic reaction, and new images join the reusable sticker library. These beats last 1–2.5 seconds and have their own small planning budget within `maxCues`. In the studio, **Sticker only** switches an existing quote beat between artwork-only and quote-card presentation.
+
+
+### AI video B-roll models
+
+In **B-roll & captions**, set **B-roll source for new beats → AI video** and choose **LTX 2.3 Fast** or **LTX 2.3 Pro**. Suggesting beats and full automation generate six-second 1080p silent clips through fal. The per-cue **AI video · 6s** action uses the same model selection. Existing completed media is reused; re-suggest beats to request a new plan and new clips.
+
+```sh
+pnpm podframes generate --template my-show --topic "Your topic" --slug new-episode --broll-source ai-video --broll-video-model ltx-fast
+```
+
+API/template options are `brollSource: "ai-video"` and `brollVideoModel: "h3-max-turbo"`, `"ltx-fast"`, or `"ltx-pro"`. `FAL_API_KEY` is required. Fast is approximately $0.36 per six-second 1080p clip and Pro $0.48, based on [Fast pricing](https://fal.ai/models/fal-ai/ltx-2.3/text-to-video/fast) and [Pro pricing](https://fal.ai/models/fal-ai/ltx-2.3/text-to-video) checked November 2026. Provider prices can change.
+
+Saved request IDs resume after interruption. A lost submission response requires checking fal history before another purchase. Pending generation stops polling after twenty minutes and can be resumed against the same request. Cancellation preserves submitted requests. Generated footage is illustrative and cannot establish an actual news event.
+
+
+### Export pace
+
+The Output step's **Export pace** adjusts the finished MP4 from 0.75× to 1.5×. The default is 1×. For a slightly tighter edit, try 1.05× or 1.1×. Audio uses pitch-preserving tempo adjustment while the full composed picture, including captions and B-roll, follows the same speed. This option re-renders the export without regenerating paid voice or avatar media. Every export starts from a fresh composition render, so repeated exports do not compound the speed.
+
+CLI accepts `--export-speed 1.1`. API and template options use `exportSpeed: 1.1`. Export duration is measured from the finished MP4. Separate source audio and subtitle downloads retain their original speech timing.
+
+MiniMax H3 Max Turbo is the default for new configurations. Select `h3-max-turbo` in `brollVideoModel` or pass `--broll-video-model h3-max-turbo`. Its [fal endpoint](https://fal.ai/models/minimax/h3-max-turbo/text-to-video/api) generates six-second clips at native 768P with prompt expansion disabled. Footage audio is muted during composition. Existing LTX requests retain their original model and resume state.

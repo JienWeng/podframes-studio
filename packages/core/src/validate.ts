@@ -25,11 +25,12 @@ export function validateConfig(config: ConversationConfig): void {
     fail("sourceUrls must contain at most five public HTTPS links");
   }
 
-  if (!Array.isArray(config.hosts) || config.hosts.length !== 2) {
-    fail(`hosts must be exactly [hostA, hostB] (got ${Array.isArray(config.hosts) ? config.hosts.length : typeof config.hosts})`);
+  if (!Array.isArray(config.hosts) || (config.hosts.length < 1 || config.hosts.length > 6)) {
+    fail(`hosts must contain 1–6 cast members (got ${Array.isArray(config.hosts) ? config.hosts.length : typeof config.hosts})`);
   }
   config.hosts.forEach((h, i) => validateHost(h, i, fail));
-  if (config.hosts[0].id === config.hosts[1].id) fail("hosts must have distinct ids");
+  if (new Set(config.hosts.map((h) => h.id)).size !== config.hosts.length) fail("hosts must have distinct ids");
+  if (new Set(config.hosts.map((h) => h.speaker.toUpperCase())).size !== config.hosts.length) fail("hosts must have distinct speaker labels");
 
   if (config.targetTurns != null && !(Number.isFinite(config.targetTurns) && config.targetTurns >= 2 && config.targetTurns <= 60)) {
     fail(`targetTurns must be 2–60 (got ${config.targetTurns})`);
@@ -51,6 +52,7 @@ function validateHost(h: Host, i: number, fail: (msg: string) => never): void {
   }
   if (!h.model.includes("/")) fail(`${at}.model must be "provider/model" (got "${h.model}")`);
   if (h.side !== "left" && h.side !== "right") fail(`${at}.side must be "left" or "right"`);
+  if (h.speechSpeed != null && !(Number.isFinite(h.speechSpeed) && h.speechSpeed >= 0.75 && h.speechSpeed <= 1.5)) fail(`${at}.speechSpeed must be 0.75–1.5`);
   if (h.defaultStability != null && !(Number.isFinite(h.defaultStability) && h.defaultStability >= 0 && h.defaultStability <= 1)) {
     fail(`${at}.defaultStability must be 0–1`);
   }
@@ -88,7 +90,8 @@ export function validateOptions(options: Partial<PipelineOptions>, fail?: (msg: 
       raise(`${name} must be ${min}–${max} (got ${String(value)})`);
     }
   };
-  oneOf("brollSource", o.brollSource, ["images", "pexels"] as const);
+  oneOf("brollSource", o.brollSource, ["images", "pexels", "ai-video"] as const);
+  oneOf("brollVideoModel", o.brollVideoModel, ["ltx-fast", "ltx-pro", "h3-max-turbo"] as const);
   oneOf("videoProvider", o.videoProvider, VIDEO_PROVIDERS.map((p) => p.id));
   oneOf("heygenAuth", o.heygenAuth, ["subscription", "api"] as const);
   oneOf("heygenExpressiveness", o.heygenExpressiveness, ["low", "medium", "high"] as const);
@@ -97,6 +100,7 @@ export function validateOptions(options: Partial<PipelineOptions>, fail?: (msg: 
   oneOf("fps", o.fps, [24, 30] as const);
   oneOf("captionStyle", o.captionStyle, CAPTION_STYLE_PRESETS.map((p) => p.id));
   oneOf("visualTreatment", o.visualTreatment, VISUAL_TREATMENTS.map((p) => p.id));
+  inRange("exportSpeed", o.exportSpeed, 0.75, 1.5);
   inRange("gapMs", o.gapMs, 0, 5000);
   inRange("maxCues", o.maxCues, 0, 20);
   inRange("videoConcurrency", o.videoConcurrency, 1, 8);

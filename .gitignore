@@ -20,7 +20,11 @@ runs/
 /library/
 
 # locally-fetched agent skills (pinned in skills-lock.json)
-.agents/
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/podframes-producer/
+!.agents/skills/podframes-deploy/
 
 # hyperframes / render caches
 .hyperframes/

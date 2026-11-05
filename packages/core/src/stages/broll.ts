@@ -1,3 +1,5 @@
+import { setTimeout as sleep } from "node:timers/promises";
+import { pollBrollVideo, brollVideoStateFile } from "../clients/broll-video";
 import { buildCaptionGroups, scriptCaptionTurns } from "../compose/captions";
 import { directQuoteStickers } from "./stickers";
 import { searchPexelsVideos, getPexelsVideo } from "../clients/pexels";
@@ -126,11 +128,14 @@ export async function runBroll(ctx: StageContext): Promise<void> {
 
     const contents = [
       `Episode: "${script.title}" — about ${config.topic}. Total ${speech.durationSec.toFixed(0)}s.`,
+      ...(config.styleNote ? [`Requested editorial style: ${config.styleNote}.`] : []),
+      ...(/source-led explainer/i.test(config.styleNote ?? "") ? ["Use source-led explainer editing: keep the presenter as the anchor, place concrete supporting visuals on the exact attributed claim, and return to the presenter for qualifications and commentary. Prefer relevant supplied source assets when their descriptions establish a match. Never generate a fake article screenshot, quotation, highlighted document, chat log, source label, or event photograph. When an actual source asset is unavailable, use an accurately worded lower-third or clearly illustrative footage. Do not substitute generic stock footage for evidence. Keep serious allegations free of comic stickers and sensational decoration."] : []),
       `Write on-screen titles, quotes, and labels in ${languageLabel(config.language ?? "en")}. Image descriptions may be in English.`,
       `Return at most ${budget} normal cues (${treatment.densityLabel}), each 2.5–5s, plus at most ${stickerBudget} brief sticker-only action beats of 1–2.5s. All cues must be non-overlapping and spread across meaningful spoken moments.`,
       ...(options.autoStickers !== false ? ["Use short quote cues for a few genuine reactions or punchlines in the dialogue. Quote artwork will be directed automatically from the conversation. Keep each quote a short faithful phrase in the episode language, ideally under 12 Chinese characters or 6 English words. Do not repeat the full spoken subtitle or decorate every turn. Use serious, sensitive or factual statements without comic embellishment."] : []),
       ...(stickerBudget ? ["For concrete tasks or objects named aloud, such as writing copy, designing, or making videos, prefer a sticker-only beat: type=quote, stickerOnly=true, and title containing the short exact action label used only for asset selection. It displays artwork without any quote panel or added lettering. Match its timing to the action words. Use normal quote cards for genuine punchlines; do not put a quote card on every action. Choose only the most useful action beats and allow a little space between them."] : []),
       "Prefer stat cards for exact numbers or comparisons, and b-roll only when a concrete visual helps explain the spoken point. Never illustrate a joke literally. Fewer strong cues are better than filler; the cue count is a ceiling, not a target.",
+      ...(options.brollSource === "ai-video" ? ["B-roll will be generated as six-second video clips. Supply imagePrompt as a video direction with one concrete subject, one natural action and restrained camera movement. Do not reuse a still-image library asset. Avoid text and logos. These are illustrative scenes, never recordings of the actual reported event."] : []),
       ...(options.brollSource === "pexels" ? ["B-roll uses real stock VIDEO from Pexels. For every broll cue, supply stockQuery with 2–6 simple English keywords describing the literal subject and action. Favor concrete everyday footage that can actually be found. Omit reuseImageId. Stock footage is illustrative and cannot establish the actual people or event in a news story."] : []),
       "For each b-roll imagePrompt, art-direct one specific shot: subject, action, environment, camera framing, light, and restrained natural colors. Vary wide establishing views and close details across the episode while keeping a coherent documentary photographic style. Compose for a small screen with one clear focal point and uncluttered edges.",
       "Think like a documentary editor: favor ordinary lived-in spaces, work in progress, practical details, and anonymous people doing relevant everyday tasks. Use candid off-center framing and available light. Avoid staged stock-photo poses, pristine futuristic spaces, dramatic hero lighting, exaggerated depth of field, and visual puns. Do not force a person into every shot.",
@@ -245,12 +250,44 @@ export async function runBroll(ctx: StageContext): Promise<void> {
     cleaned = cleaned.filter((cue) => !omitted.has(cue.id));
   }
 
+  if (options.showBroll !== false && options.brollSource === "ai-video") {
+    if (!env.falApiKey) throw new Error("Set FAL_API_KEY for AI B-roll video.");
+    const model = options.brollVideoModel ?? "ltx-pro";
+    const aspectRatio = config.aspectRatio ?? "16:9";
+    for (const cue of cleaned.filter((item) => item.type === "broll")) {
+      signal?.throwIfAborted();
+      if (cue.videoPath) {
+        if (!fileExists(project.abs(cue.videoPath))) throw new Error(`Saved B-roll video for ${cue.id} is missing. Replace it before resuming.`);
+        continue;
+      }
+      const prompt = cue.imagePrompt?.trim();
+      if (!prompt) throw new Error(`Add a video prompt for ${cue.id}.`);
+      const statePath = project.path(".broll-video", brollVideoStateFile(cue.id, prompt, aspectRatio, model));
+      log.info(`Generating six-second ${model} B-roll`, { cueId: cue.id });
+      const deadline = Date.now() + 20 * 60_000;
+      let job = await pollBrollVideo({ apiKey: env.falApiKey, prompt, aspectRatio, statePath, model });
+      while (job.status === "pending") {
+        if (Date.now() >= deadline) throw new Error("B-roll video is still pending. Resume to poll the saved provider request.");
+        await sleep(5000, undefined, { signal });
+        job = await pollBrollVideo({ apiKey: env.falApiKey, prompt, aspectRatio, statePath, model });
+      }
+      signal?.throwIfAborted();
+      const imported = await importFootageFile({ project, bytes: await downloadFootage(job.url!), signal });
+      cue.videoPath = imported.videoPath;
+      cue.sourceUrl = job.url;
+      delete cue.imagePath;
+      delete cue.pexels;
+      cue.end = Math.min(cue.end, cue.start + imported.duration);
+      await project.save();
+    }
+  }
+
   // Generate b-roll images (only for type=broll). Minimal/editorial use the fixed
   // square compose card (see compose/builder.ts .broll-card) so a square source
   // needs no cropping; cinematic's full-frame takeovers get canvas-aspect 2K
   // sources instead (see brollImageGeometry).
   const geometry = brollImageGeometry(options.visualTreatment, config.aspectRatio);
-  const brollCues = cleaned.filter((c) => options.showBroll !== false && options.brollSource !== "pexels" && options.generateBrollImages !== false && c.type === "broll" && (c.imagePrompt || c.imagePath));
+  const brollCues = cleaned.filter((c) => options.showBroll !== false && options.brollSource !== "pexels" && options.brollSource !== "ai-video" && options.generateBrollImages !== false && c.type === "broll" && (c.imagePrompt || c.imagePath));
   if (brollCues.length)
     log.info(`generating ${brollCues.length} b-roll images with ${options.brollImageModel}`);
 

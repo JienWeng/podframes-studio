@@ -153,9 +153,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ slug: 
 
     // ── Hosts (voice/model → that host's turns; name/side → identity; persona → script) ──
     if (body.hosts) {
+      try { validateConfig({ ...s.config, hosts: body.hosts }); }
+      catch (error) { return new Response(error instanceof Error ? error.message : "Invalid cast.", { status: 400 }); }
       const prev = s.config.hosts;
-      body.hosts.forEach((h, i) => {
-        const old = prev[i];
+      if (prev.some((host) => !body.hosts!.some((next) => next.id === host.id)) && s.script?.turns.some((turn) => !body.hosts!.some((host) => host.id === turn.hostId))) {
+        return new Response("Remove or reassign this cast member’s script lines before removing them.", { status: 400 });
+      }
+      if (prev.length !== body.hosts.length) add(INVALIDATION.hostIdentity);
+      body.hosts.forEach((h) => {
+        const old = prev.find((host) => host.id === h.id);
         if (!old) {
           add(INVALIDATION.hostIdentity);
           add(INVALIDATION.hostVoice);
@@ -166,6 +172,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ slug: 
         if (
           h.voice !== old.voice ||
           h.model !== old.model ||
+          (h.speechSpeed ?? 1) !== (old.speechSpeed ?? 1) ||
           h.defaultStability !== old.defaultStability ||
           h.defaultStyle !== old.defaultStyle
         ) {
@@ -181,10 +188,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ slug: 
         // Absent persona means "not provided by this client", never "cleared".
         if (h.persona !== undefined && h.persona !== old.persona) add(INVALIDATION.topic);
       });
-      s.config.hosts = body.hosts.slice(0, 2).map((h, i) => ({
+      s.config.hosts = body.hosts.map((h) => ({
         ...h,
-        persona: h.persona ?? prev[i]?.persona,
-      })) as [Host, Host];
+        persona: h.persona ?? prev.find((host) => host.id === h.id)?.persona,
+      }));
       await syncRosterAvatarUploads(project);
     }
 

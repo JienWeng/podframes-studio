@@ -56,6 +56,9 @@ export async function POST(
           if (input.expectedAspectRatio !== undefined && input.expectedAspectRatio !== (project.state.config.aspectRatio ?? "16:9")) {
             return new Response("Project aspect ratio changed while the video was generating. Review the cue before replacing its media.", { status: 409 });
           }
+          if (input.expectedBrollVideoModel !== undefined && input.expectedBrollVideoModel !== (project.state.options.brollVideoModel ?? "ltx-pro")) {
+            return new Response("B-roll video model changed while generating. Switch back to recover the saved result.", { status: 409 });
+          }
           sourceUrl = input.url;
           bytes = await downloadFootage(sourceUrl!);
         }

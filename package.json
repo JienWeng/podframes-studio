@@ -25,7 +25,9 @@
     "test": "pnpm -r test",
     "lint": "pnpm -r lint",
     "clean": "pnpm -r clean && rm -rf node_modules",
-    "worker": "node --import tsx scripts/worker.mts"
+    "worker": "node --import tsx scripts/worker.mts",
+    "producer": "node --import tsx scripts/producer.mts",
+    "production": "node --import tsx scripts/production.mts"
   },
   "keywords": [
     "podcast",

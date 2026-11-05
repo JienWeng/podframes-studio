@@ -1,0 +1,18 @@
+# Podframes
+
+> Creator workspace for scripted podcast videos with reusable cast, series templates, local generation workers, and reviewable exports.
+
+## Start here
+
+- [Agent production workflow](/agent-guide.md): Discovery, one-question-at-a-time setup, draft review, explicit approval before paid media, batch generation, and recovery.
+- [Health and worker status](/api/v1/health): Inspect configured services and worker readiness.
+- [Cast and series library](/api/v1/library): Discover available saved identities and series before selecting them.
+- [Projects](/api/v1/projects): Inspect existing episodes and saved progress.
+
+The owner-authentication rules apply to these resources. Use the configured origin and owner Bearer token for API access. Keep credentials out of prompts, files, and shared links.
+
+Repository-based Codex sessions can invoke `$podframes-producer` from `.agents/skills/podframes-producer/SKILL.md`. Runtime skill discovery depends on the client loading this repository. This file is a navigation aid for clients that choose to read it.
+
+For paired-device orchestration, repository agents should read `docs/REMOTE_CODEX.md` in the connected Podframes checkout. Pairing does not move provider logins or SQLite to another host.
+
+Repository deployment: invoke `$podframes-deploy` or read `docs/PRODUCTION.md`. Hosted agents must explicitly read this authenticated document; it does not install skills or provision a server.

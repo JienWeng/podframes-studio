@@ -109,10 +109,11 @@ function overlay(
   inner: string,
   initialOpacity = 0,
   allowOcclusion = false,
+  timed = true,
 ): string {
-  return `    <div id="${id}" class="clip overlay ${cls}"${allowOcclusion ? " data-layout-allow-occlusion" : ""} data-start="${r2(start)}" data-duration="${r2(
-    Math.max(0.1, duration),
-  )}" data-track-index="${track}" style="opacity:${initialOpacity}">
+  // HyperFrames must own the video's timing directly, without a timed ancestor.
+  const timing = timed ? ` data-start="${r2(start)}" data-duration="${r2(Math.max(0.1, duration))}" data-track-index="${track}"` : "";
+  return `    <div id="${id}" class="${timed ? "clip " : ""}overlay ${cls}"${allowOcclusion ? " data-layout-allow-occlusion" : ""}${timing} style="opacity:${initialOpacity}">
 ${inner}
     </div>`;
 }
@@ -288,6 +289,7 @@ export function buildComposition(input: BuildInput): string {
         cueInner(cue, color, input.height > input.width ? "9:16" : "16:9"),
         0,
         start < introDur,
+        !cue.videoPath,
       ),
     );
     if (cue.textTemplate || cue.stickerOnly) {

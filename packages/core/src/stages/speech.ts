@@ -22,6 +22,7 @@ interface TurnSidecar {
   voice: string;
   text: string;
   language?: string;
+  speechSpeed?: number;
   /** The pause baked into this turn's last segment (options.gapMs at synth time). */
   gapMs: number;
   segments: TurnSegment[];
@@ -71,6 +72,7 @@ export async function runSpeech(ctx: StageContext): Promise<void> {
       side.hostId !== t.hostId ||
       side.model !== host.model ||
       side.voice !== host.voice ||
+      (side.speechSpeed ?? 1) !== (host.speechSpeed ?? 1) ||
       side.text !== t.text ||
       (side.language ?? "en") !== (config.language ?? "en") ||
       side.gapMs !== (options.gapMs ?? 320) ||
@@ -100,6 +102,7 @@ export async function runSpeech(ctx: StageContext): Promise<void> {
       signal,
       model: host.model,
       voice: host.voice,
+      speechSpeed: host.speechSpeed ?? 1,
       text,
       language: config.language ?? "en",
       cachePath: project.path("audio", `turn-${t.index}.fish-mcp.json`),
@@ -148,6 +151,7 @@ export async function runSpeech(ctx: StageContext): Promise<void> {
         hostId: t.hostId,
         model: host.model,
         voice: host.voice,
+        speechSpeed: host.speechSpeed ?? 1,
         text: t.text,
         language: config.language ?? "en",
         gapMs: options.gapMs ?? 320,

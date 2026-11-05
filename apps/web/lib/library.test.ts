@@ -31,6 +31,7 @@ async function fixture() {
   const hosts = structuredClone(DEFAULT_HOSTS);
   hosts[0].model = "fish/drama-3";
   hosts[0].defaultStyle = "quietly curious";
+  hosts[0].speechSpeed = 1.25;
   const project = await Project.create(
     {
       topic: "A reusable show",
@@ -82,6 +83,7 @@ test("saved cast copies its portrait and settings and preserves the target role"
   );
   assert.equal(project.state.config.hosts[1].model, "fish/drama-3");
   assert.equal(project.state.config.hosts[1].defaultStyle, "quietly curious");
+  assert.equal(project.state.config.hosts[1].speechSpeed, 1.25);
   assert.deepEqual(
     new Uint8Array(
       await readFile(project.abs(project.state.uploads![target.id])),
@@ -91,6 +93,21 @@ test("saved cast copies its portrait and settings and preserves the target role"
   assert.equal((await listLibrary(root)).cast.length, 1);
   assert.throws(() => libraryId("../../secret"), /Invalid library/);
   await assert.rejects(saveCast(target, new Uint8Array([1, 2]), root), /PNG/);
+});
+
+test("applying saved cast preserves additional panel members and supports solo", async (t) => {
+  const { root, project } = await fixture();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const saved = await saveCast(project.state.config.hosts[0], portrait, root);
+  project.state.config.hosts.push({ ...project.state.config.hosts[0], id: "host_c", speaker: "HOST_C", name: "Third" });
+  await applySavedCast(project, saved.id, "host_c");
+  assert.equal(project.state.config.hosts.length, 3);
+  assert.equal(project.state.config.hosts[2].id, "host_c");
+  assert.equal(project.state.config.hosts[2].name, saved.name);
+  project.state.config.hosts = [project.state.config.hosts[2]];
+  await applySavedCast(project, saved.id, "host_c");
+  assert.equal(project.state.config.hosts.length, 1);
+  assert.equal(project.state.config.hosts[0].speaker, "HOST_C");
 });
 
 test("series retains independent template assets after the source video is removed", async (t) => {

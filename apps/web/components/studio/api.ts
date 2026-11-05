@@ -104,6 +104,7 @@ export async function previewVoice(opts: {
   language?: string;
   model: string;
   voice: string;
+  speechSpeed?: number;
   stability?: number;
   style?: string;
   text?: string;

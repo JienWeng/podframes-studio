@@ -72,6 +72,19 @@ export function Step3Videos() {
     void ctx.patch({ options: { videoProvider: p } });
   }
 
+  async function setExpressiveness(level: "low" | "medium" | "high") {
+    if (level === (project?.options.heygenExpressiveness ?? "high")) return;
+    const clipCount = project?.clips?.length ?? 0;
+    if (clipCount > 0 && !(await ctx.confirm({
+      title: "Change expression level?",
+      body: "Changing expression level requires regenerating the avatar clips.",
+      details: [`Will delete ${clipCount} generated clip${clipCount === 1 ? "" : "s"}.`, "Regeneration uses HeyGen credits."],
+      confirmLabel: "Change expression level",
+      tone: "warn",
+    }))) return;
+    await ctx.patch({ options: { heygenExpressiveness: level } });
+  }
+
   async function generateSelected() {
     if (!selected.length || !ctx.slug) return;
     // ALWAYS confirm before kicking off paid animation — with what it costs.
@@ -162,6 +175,25 @@ export function Step3Videos() {
             <option value="api">API credits (HEYGEN_API_KEY)</option>
           </select>
         </label>
+      )}
+
+      {provider === "heygen" && (
+        <div className="mb-5">
+          <label className="block text-xs text-[var(--color-text-secondary)]">
+            Expression level
+            <select
+              value={project?.options.heygenExpressiveness ?? "high"}
+              disabled={disabled}
+              onChange={(event) => void setExpressiveness(event.target.value as "low" | "medium" | "high")}
+              className="ml-3 border border-[var(--color-hairline)] bg-[var(--color-surface)] p-2"
+            >
+              <option value="low">Low · subtle</option>
+              <option value="medium">Medium · balanced</option>
+              <option value="high">High · expressive (default)</option>
+            </select>
+          </label>
+          <p className="mt-2 text-xs text-[var(--color-text-muted)]">Controls HeyGen avatar expression. Voice delivery is set in Cast & voice and the script.</p>
+        </div>
       )}
 
       <div className="mono mb-2 flex items-center justify-between text-[10px] tracking-[0.08em] text-[var(--color-text-muted)]">

@@ -183,7 +183,7 @@ async function runPipeline(project: Project, opts: GenerateOptions, root: string
   // ffmpeg/ffprobe for the media stages, and every API key the executing stages
   // need. A missing FAL key must not surface only after script+speech+stills
   // were already paid for.
-  const NEEDS_FFMPEG: ReadonlySet<StageName> = new Set(["speech", "video", "compose", "render", ...(project.state.options.brollSource === "pexels" ? ["broll" as const] : [])]);
+  const NEEDS_FFMPEG: ReadonlySet<StageName> = new Set(["speech", "video", "compose", "render", ...(["pexels", "ai-video"].includes(project.state.options.brollSource ?? "images") ? ["broll" as const] : [])]);
   if (willRun.some((s) => NEEDS_FFMPEG.has(s.name))) {
     await ensureBinary("ffmpeg", "Install ffmpeg (macOS: `brew install ffmpeg`) and retry.");
     await ensureBinary("ffprobe", "ffprobe ships with ffmpeg (macOS: `brew install ffmpeg`).");
@@ -210,7 +210,7 @@ async function runPipeline(project: Project, opts: GenerateOptions, root: string
   }
   if (willRun.some((s) => s.name === "script")) await assertWritingReady(project.state.options.scriptModel);
   if (willRun.some((s) => s.name === "broll") && (project.state.options.showBroll !== false || project.state.options.showGraphics !== false)) await assertWritingReady(project.state.options.cueModel);
-  if (willRun.some((s) => ["speech", "stills"].includes(s.name) || (s.name === "broll" && ((project.state.options.showBroll !== false && project.state.options.generateBrollImages !== false && project.state.options.brollSource !== "pexels") || (project.state.options.showGraphics !== false && project.state.options.autoStickers !== false)))) && !(await codexStatus())) {
+  if (willRun.some((s) => ["speech", "stills"].includes(s.name) || (s.name === "broll" && ((project.state.options.showBroll !== false && project.state.options.generateBrollImages !== false && project.state.options.brollSource !== "pexels" && project.state.options.brollSource !== "ai-video") || (project.state.options.showGraphics !== false && project.state.options.autoStickers !== false)))) && !(await codexStatus())) {
     throw new Error("Codex ChatGPT login required: install Codex CLI, then run `codex login`.");
   }
   if (willRun.some((s) => s.name === "video") && project.state.options.videoProvider === "heygen") {
@@ -283,6 +283,9 @@ export function missingKeys(
   }
   if (stages.includes("video") && options.videoProvider === "replicate-p-video" && !env.replicateApiKey) {
     out.push({ envVar: "REPLICATE_API_KEY", reason: "the default replicate-p-video provider" });
+  }
+  if (stages.includes("broll") && options.showBroll !== false && options.brollSource === "ai-video" && !env.falApiKey) {
+    out.push({ envVar: "FAL_API_KEY", reason: "AI B-roll video generation" });
   }
   if (stages.includes("broll") && options.showBroll !== false && options.brollSource === "pexels" && !env.pexelsApiKey) {
     out.push({ envVar: "PEXELS_API_KEY", reason: "Pexels stock-video B-roll" });

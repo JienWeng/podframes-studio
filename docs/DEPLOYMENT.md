@@ -1,10 +1,70 @@
-# Hosted studio with a Mac generation worker
+# Deploy Podframes
 
-For the implemented single-machine Ubuntu VM or macOS setup, including installation and background services, use [SETUP.md](SETUP.md). This document describes a different, proposed distributed deployment.
+## Recommended now: one persistent host
 
-The local implementation now has whole-app owner authentication, a versioned automation API with durable request receipts, a SQLite queue, persisted job events, generation-operation limits, and a separate Mac worker started with `pnpm worker`. The worker and web process currently share one local filesystem. Codex, Claude Code, OpenAI API, and Anthropic API writers are selectable. See [API.md](API.md).
+Run the web/API and the generation worker as **two processes on the same Ubuntu VM or Mac**, under the same user and checkout. They share local project files, provider logins, and `.automation/state.sqlite`. Keep this database on a local persistent disk. This is the implemented deployment; moving only the web frontend to a separate server will not work with the current storage and queue.
 
-The cloud architecture below remains a deployment proposal. Outbound cloud-to-Mac job transport, cloud asset synchronization, individual customer accounts, schedules, and a hosted automation hub still need implementation. The local worker separation alone does not enable the Railway layout below.
+[SETUP.md](SETUP.md) provides installation, provider authentication, background services, backups, and recovery. The existing installer supports Ubuntu 24.04 x86_64 and macOS. Our completed video was generated on a Mac; Ubuntu installation support is not an end-to-end production benchmark or a verified subscription-login guarantee.
+
+### Machine sizing
+
+These are planning recommendations for **one active video job**, not measured minimum requirements. Most image, voice, avatar, and AI B-roll generation happens at providers; local CPU/RAM handles Whisper, browser frame capture, and encoding. A dedicated GPU is not required.
+
+| Host | Starting configuration | Preferred configuration |
+| --- | --- | --- |
+| Ubuntu VM | 8 dedicated vCPUs, 16 GB RAM, 250 GB persistent SSD | 8 dedicated vCPUs, 32 GB RAM, 500 GB SSD |
+| Apple Silicon Mac | 24 GB unified memory, 512 GB SSD | 32 GB unified memory, 512 GB or larger SSD plus a 1 TB external SSD for media/backups |
+
+CPU architecture, sustained performance, browser rendering, and provider latency matter more than the vCPU count alone. Keep one worker instance initially. More jobs require capacity and queue-concurrency work; starting duplicate workers is not a scaling plan. A Mac must stay awake and connected, and its LaunchAgents require the service user's desktop login after reboot. A Linux VM is simpler for unattended reboot recovery.
+
+The measured Northwoods episode contains about **42 MB retained project data**, including a **14.4 MB, 33.2-second final export** from roughly 42 seconds of source dialogue. Intermediate raw output previously occupied about **55.8 MB** and was removed after successful export. This is one short example, not a storage limit. Budget **0.5–2 GB of temporary working space per short episode** as a generous starting allowance, then measure your own resolution, clip count, and retry history. Models, browser binaries, dependencies, and backups need additional disk.
+
+### Installation and automatic startup
+
+After installing and authenticating using [Setup](SETUP.md), install the repository's existing service templates:
+
+```sh
+cd "$HOME/podframes"
+bash scripts/setup.sh services
+```
+
+On Ubuntu this installs `~/.config/systemd/user/podframes-{web,worker}.service` and enables user lingering. Check both processes:
+
+```sh
+systemctl --user status podframes-web podframes-worker
+journalctl --user -u podframes-worker -f
+```
+
+On macOS it installs `~/Library/LaunchAgents/com.podframes.{web,worker}.plist`:
+
+```sh
+launchctl print "gui/$(id -u)/com.podframes.web"
+launchctl print "gui/$(id -u)/com.podframes.worker"
+```
+
+Use the supplied persistent worker service, not a one-shot worker. The web app can accept jobs while the worker is offline, but they remain queued. Do not start another foreground worker alongside the service. The [startup and shutdown commands](SETUP.md#5-run-in-the-background) are the authoritative service instructions; no separate handwritten service files are needed.
+
+### Video storage and access
+
+Current exports live at `projects/<slug>/output.mp4`; project folders also hold reusable paid audio, avatar clips, B-roll, provider receipts, and timing data. Saved cast and series live under `library/`. Studio serves the final video through the protected `/api/media/<slug>/output.mp4` route. The owner can preview/download it in Studio, or copy it over SSH/SFTP. Do not publish the project directory as an unauthenticated static folder.
+
+For private remote access, keep the service on localhost and use the [SSH tunnel](SETUP.md#4-check-readiness-and-start-manually). For a public domain, put an HTTPS reverse proxy in front of localhost:3000, preserve Host/Origin and streaming/upload support, and keep owner authentication enabled. This requires proxy/DNS configuration beyond the installer. The authenticated [automation API](API.md) runs in the same application; the worker is a separate process, not an independently hosted API service.
+
+Back up `projects/`, `library/`, and `.automation/` together while services are idle, plus encrypted settings and custom scripts. Keep an off-host backup; an external SSD attached to the same Mac is useful working storage but not the only backup. Follow [migration precautions](SETUP.md#backup-and-move-to-another-machine) before restoring queued or interrupted paid jobs.
+
+**Future storage option:** private Cloudflare R2 for durable video/media objects, with short-lived signed download URLs. It would reduce VM disk pressure and simplify remote downloads. R2 upload, manifests, retention, signed URLs, and recovery synchronization are **not implemented**; adding bucket credentials alone does not enable them. R2 Standard lists $0.015/GB-month with a 10 GB-month free allowance and no Internet egress charge; request operations are billed separately. Check [official pricing](https://developers.cloudflare.com/r2/pricing/) before provisioning. Keep active render scratch and SQLite on local disk even after object storage is added.
+
+### First-host acceptance check
+
+1. Run `pnpm podframes doctor`; verify persistent worker heartbeat and authenticated Studio/API access.
+2. Complete Codex, Fish MCP, and selected HeyGen subscription/API authentication on the actual host. Confirm subscription entitlement, remaining credits, and Codex image availability; a successful login alone is insufficient.
+3. Run the [import-only smoke check](SETUP.md#6-verify-without-buying-generation), then explicitly authorize one short paid episode.
+4. Review audio, captions, portrait identity, lip sync, B-roll motion, and final download. Test Ubuntu's software browser rendering rather than assuming Mac performance transfers.
+5. While idle, restart both services and verify queued work, library assets, and existing downloads survive. Prove a backup restore without launching copied paid jobs twice.
+
+## Future: hosted web with a separate Mac worker
+
+The remaining sections are a **distributed deployment proposal**, not the current installation. Outbound cloud-to-Mac job transport, cloud asset synchronization, individual customer accounts, schedules, and the hosted automation hub still need implementation. Current owner authentication, the versioned automation API, durable request receipts, SQLite queue/events, operation limits, and separate local worker are implemented. Codex, Claude Code, OpenAI API, and Anthropic API writers are selectable.
 
 ## Hosting choice
 

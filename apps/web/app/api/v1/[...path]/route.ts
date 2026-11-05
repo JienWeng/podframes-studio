@@ -80,6 +80,7 @@ async function dispatch(
   const denied = automationAuthorization(
     request,
     process.env.PODFRAMES_API_TOKEN,
+    findRepoRoot(),
   );
   if (denied) return denied;
   const path = (await context.params).path;

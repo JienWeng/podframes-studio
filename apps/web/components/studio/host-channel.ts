@@ -19,9 +19,10 @@ export function defaultChannel(
 export const channelToHost = (c: Channel): Host => ({
   id: c.id,
   name: c.name,
-  speaker: c.id === "host_a" ? "HOST_A" : "HOST_B",
+  speaker: c.id.toUpperCase(),
   model: c.model,
   voice: c.voice,
+  speechSpeed: c.speechSpeed,
   side: c.side,
   appearance: c.appearance,
   // Carried through even though the studio has no persona editor — dropping it

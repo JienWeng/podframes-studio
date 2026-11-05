@@ -142,7 +142,7 @@ export function Step2Script() {
 
   return (
     <div>
-      <StepHeader title="Script" hint="A topic becomes a tight two-host dialogue. Tweak any line, then re-voice it." />
+      <StepHeader title="Script" hint="A topic becomes a conversation with your selected cast. Tweak any line, then re-voice it." />
       <p className="mb-3 text-xs text-[var(--color-text-muted)]">
         Language: {languageLabel(language)} · <button onClick={() => ctx.go(1)} className="text-[var(--color-accent)] hover:underline">change in Cast &amp; voice</button>
         {script && language !== (project?.config.language ?? "en") && " · Rewrite to apply the new language."}
@@ -174,6 +174,11 @@ export function Step2Script() {
       <div className="mt-3">
         <label className="mono mb-1.5 block text-[10px] tracking-[0.08em] text-[var(--color-text-muted)]">STYLE</label>
         <input value={style} disabled={disabled} onChange={(e) => setStyle(e.target.value)} placeholder={DEFAULT_STYLE} className={inputClass} />
+        <button type="button" disabled={disabled} aria-pressed={/source-led explainer/i.test(style)} onClick={() => setStyle("source-led explainer — conversational Malaysian delivery, concrete opening, short reactions, clear source attribution")}
+          className="mt-2 rounded-md border border-[var(--color-hairline)] px-3 py-1.5 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-surface)] disabled:opacity-50">
+          Use reference style · Source-led explainer
+        </button>
+        <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">Presenter-led news rhythm with supporting visuals at each claim. Add real article images or footage in B-roll for source panels.</p>
       </div>
 
       <div className="mt-3 flex flex-wrap items-end gap-4">

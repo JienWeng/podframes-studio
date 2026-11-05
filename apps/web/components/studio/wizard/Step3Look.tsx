@@ -373,10 +373,19 @@ export function Step3Look() {
         <select value={options?.brollSource ?? "images"} disabled={disabled} className={inputClass} onChange={(event) => void setOption({ brollSource: event.target.value, showBroll: true })}>
           <option value="images">Codex images</option>
           <option value="pexels">Pexels stock videos</option>
+          <option value="ai-video">AI video · fal credits</option>
         </select>
       </label>
+      <label className="mt-3 block text-sm">AI B-roll video model
+        <select value={options?.brollVideoModel ?? "ltx-pro"} disabled={disabled || !!videoJob} className={inputClass} onChange={(event) => void setOption({ brollVideoModel: event.target.value })}>
+          <option value="h3-max-turbo">MiniMax H3 Max Turbo · 768p</option>
+          <option value="ltx-fast">LTX 2.3 Fast · budget · about $0.36 / clip</option>
+          <option value="ltx-pro">LTX 2.3 Pro · about $0.48 / clip</option>
+        </select>
+      </label>
+      {options?.brollSource === "ai-video" && <p className="mt-2 text-xs text-[var(--color-text-secondary)]">Suggest beats generates six-second clips using fal credits. MiniMax uses native 768p, while LTX uses 1080p. Templates and automation inherit the selected model.</p>}
       {options?.brollSource === "pexels" && <p className="mt-2 text-xs text-[var(--color-text-secondary)]">Suggest beats searches and imports footage automatically. New episodes and automation inherit this choice. <a href="https://www.pexels.com" target="_blank" rel="noreferrer" className="underline">Videos provided by Pexels ↗</a></p>}
-      {options?.brollSource !== "pexels" && options?.showBroll !== false && <label className="mt-4 flex items-center gap-2 text-sm"><input type="checkbox" checked={options?.generateBrollImages !== false} disabled={disabled} onChange={(event) => void setOption({ generateBrollImages: event.target.checked })} />Generate AI B-roll images when suggesting beats</label>}
+      {options?.brollSource !== "pexels" && options?.brollSource !== "ai-video" && options?.showBroll !== false && <label className="mt-4 flex items-center gap-2 text-sm"><input type="checkbox" checked={options?.generateBrollImages !== false} disabled={disabled} onChange={(event) => void setOption({ generateBrollImages: event.target.checked })} />Generate AI B-roll images when suggesting beats</label>}
       {options?.showBroll === false && <p className="mt-4 text-xs text-[var(--color-text-muted)]">B-roll is hidden in this export. Enable its toggle to use these beats.</p>}
       {/* B-roll */}
       <div className="mono mb-2 mt-6 flex items-center justify-between text-[10px] tracking-[0.08em] text-[var(--color-text-muted)]">
@@ -586,7 +595,7 @@ export function Step3Look() {
                   <div className="flex gap-2">
                     <textarea value={cue.imagePrompt ?? ""} disabled={disabled} onChange={(e) => setCues((c) => c.map((x, j) => (j === i ? { ...x, imagePrompt: e.target.value } : x)))} rows={2} maxLength={2000} placeholder="Describe the image or video" aria-label="AI image or video prompt" className={`${inputClass} resize-none`} />
                     <button onClick={() => regen(cue)} disabled={disabled || options?.generateBrollImages === false || !cue.imagePrompt || regenId !== null} className="btn btn-ghost shrink-0 px-3 text-xs disabled:opacity-50" title="Generate an AI illustration to replace this image">{regenId === cue.id ? "…" : "Generate AI"}</button>
-                    <button type="button" onClick={() => void generateVideo(cue)} disabled={disabled || !cue.imagePrompt?.trim() || regenId !== null} className="btn btn-ghost shrink-0 px-3 text-xs disabled:opacity-50" title="Generate a six-second LTX video using fal credits">{videoJob?.cueId === cue.id ? "Generating…" : "AI video · 6s"}</button>
+                    <button type="button" onClick={() => void generateVideo(cue)} disabled={disabled || !cue.imagePrompt?.trim() || regenId !== null} className="btn btn-ghost shrink-0 px-3 text-xs disabled:opacity-50" title={`Generate a six-second ${options?.brollVideoModel === "h3-max-turbo" ? "MiniMax H3 Max Turbo" : options?.brollVideoModel === "ltx-fast" ? "LTX Fast" : "LTX Pro"} video using fal credits`}>{videoJob?.cueId === cue.id ? "Generating…" : "AI video · 6s"}</button>
                   </div>
                 )}
               </div>

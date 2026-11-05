@@ -6,7 +6,7 @@ cd "$(dirname "$0")/.."
 root="$PWD"
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 action="${1:-install}"
-case "$action" in install|services) ;; *) echo 'Usage: bash scripts/setup.sh [install|services]' >&2; exit 1 ;; esac
+case "$action" in install|services|access) ;; *) echo 'Usage: bash scripts/setup.sh [install|services|access]' >&2; exit 1 ;; esac
 [[ "$EUID" -ne 0 ]] || { echo 'Run as a regular user with sudo access, not root.' >&2; exit 1; }
 # Service formats require additional escaping for other path characters.
 [[ "$root" =~ ^[a-zA-Z0-9_./-]+$ && "$HOME" =~ ^[a-zA-Z0-9_./-]+$ ]] || {
@@ -24,8 +24,14 @@ case "$platform" in
   *) echo 'Supported platforms: Ubuntu 24.04 x86_64 and macOS.' >&2; exit 1 ;;
 esac
 
+if [[ "$action" == access ]]; then
+  [[ -d node_modules/tsx ]] || { echo 'Install dependencies first with pnpm install --frozen-lockfile.' >&2; exit 1; }
+  node --import tsx scripts/setup-access.mts
+  exit 0
+fi
+
 if [[ "$action" == services ]]; then
-  [[ -s .env.local && -f apps/web/.next/BUILD_ID ]] || { echo 'Run setup install and complete configuration first.' >&2; exit 1; }
+  bash scripts/run-service.sh check
   if [[ "$platform" == Linux ]]; then
     mkdir -p "$HOME/.config/systemd/user"
     for name in web worker; do

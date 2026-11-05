@@ -5,6 +5,7 @@ export interface Channel {
   provider: string;
   model: string;
   voice: string;
+  speechSpeed?: number;
   side: "left" | "right";
   appearance: string;
   /** Script-writer personality hint — no editor in the studio, but round-tripped

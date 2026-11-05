@@ -6,7 +6,7 @@ import { run } from "../util/proc";
 import { fileExists } from "../util/fs";
 import { probeDuration } from "../util/audio";
 import type { StageContext } from "./context";
-import type { OutputArtifact } from "../types";
+import type { OutputArtifact, PipelineOptions } from "../types";
 
 /**
  * Resolve how to invoke the hyperframes CLI. pnpm nests the bin under the
@@ -37,6 +37,31 @@ function resolveHyperframes(root: string): { cmd: string; prefix: string[] } {
     if (fileExists(local)) return { cmd: local, prefix: [] };
   }
   return { cmd: "npx", prefix: ["--yes", "hyperframes"] };
+}
+
+/** Normalize a fresh HyperFrames render and apply the selected playback pace once. */
+export function exportVideoArgs(rawPath: string, outPath: string, settings: {
+  width: number; height: number; downscale: boolean;
+  options: Pick<PipelineOptions, "renderQuality" | "fps" | "exportSpeed">;
+}): string[] {
+  const { width, height, downscale, options } = settings;
+  const speed = options.exportSpeed ?? 1;
+  if (!Number.isFinite(speed) || speed < 0.75 || speed > 1.5) throw new Error("Export speed must be 0.75–1.5.");
+  const retime = speed !== 1;
+  const filters = [
+    ...(retime ? [`setpts=(PTS-STARTPTS)/${speed}`] : []),
+    ...(downscale ? [`scale=${width}:${height}:flags=lanczos`] : []),
+  ];
+  return [
+    "-y", "-v", "error", "-ignore_editlist", "1", "-i", rawPath,
+    ...(downscale || retime ? [
+      "-vf", filters.join(","), "-c:v", "libx264", "-bf", "0",
+      "-preset", options.renderQuality === "draft" ? "veryfast" : "medium",
+      "-crf", options.renderQuality === "draft" ? "22" : "18", "-pix_fmt", "yuv420p",
+      ...(retime ? ["-r", String(options.fps), "-af", `asetpts=PTS-STARTPTS,atempo=${speed}`, "-c:a", "aac", "-b:a", "192k"] : ["-c:a", "copy"]),
+    ] : ["-c", "copy"]),
+    "-movflags", "+faststart", outPath,
+  ];
 }
 
 export async function runRender(ctx: StageContext): Promise<void> {
@@ -112,24 +137,9 @@ export async function runRender(ctx: StageContext): Promise<void> {
       ? `normalizing mp4 + downscaling to ${targetW}x${targetH} (videoResolution=${options.videoResolution})`
       : "normalizing mp4 (stripping empty leading edit → no black first frame)",
   );
-  await run("ffmpeg", [
-    "-y", "-v", "error",
-    "-ignore_editlist", "1",
-    "-i", rawPath,
-    ...(downscale
-      ? [
-          "-vf", `scale=${targetW}:${targetH}:flags=lanczos`,
-          "-c:v", "libx264",
-          "-bf", "0",
-          "-preset", options.renderQuality === "draft" ? "veryfast" : "medium",
-          "-crf", options.renderQuality === "draft" ? "22" : "18",
-          "-pix_fmt", "yuv420p",
-          "-c:a", "copy",
-        ]
-      : ["-c", "copy"]),
-    "-movflags", "+faststart",
-    outPath,
-  ]);
+  const exportSpeed = options.exportSpeed ?? 1;
+  if (exportSpeed !== 1) log.info(`Applying ${exportSpeed}× export pace to picture and sound`);
+  await run("ffmpeg", exportVideoArgs(rawPath, outPath, { width: targetW, height: targetH, downscale, options }), { signal: ctx.signal });
   await rm(rawPath, { force: true });
 
   if (!fileExists(outPath)) throw new Error("mp4 normalization failed — output.mp4 missing");

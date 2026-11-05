@@ -11,6 +11,7 @@ export function Step4Output() {
   const done = project?.stages.render === "done" && !!project?.videoUrl;
   const regions = project?.speech?.turns ?? [];
   const audioExt = project?.audioUrl?.split("?")[0].split(".").pop() || "mp3";
+  const exportSpeed = project?.options?.exportSpeed ?? 1;
   const quality = project?.options?.renderQuality ?? "high";
 
   async function render() {
@@ -51,6 +52,14 @@ export function Step4Output() {
         </div>
       </div>
 
+      <label className="mb-4 flex items-center justify-between gap-4 rounded-md border border-[var(--color-hairline)] px-3 py-3">
+        <span><span className="block text-[13px] font-medium">Export pace</span><span className="block text-[11px] text-[var(--color-text-muted)]">1.05×–1.1× gives a tighter cut. Picture, captions and sound move together.</span></span>
+        <select aria-label="Export pace" value={exportSpeed} disabled={disabled} onChange={(event) => void ctx.patch({ options: { exportSpeed: Number(event.target.value) } })} className="rounded border border-[var(--color-hairline)] bg-[var(--color-surface)] px-2 py-1 text-sm">
+          {[0.75, 0.9, 1, 1.05, 1.1, 1.25, 1.5].map((speed) => <option key={speed} value={speed}>{speed}×{speed === 1 ? " · original" : ""}</option>)}
+          {![0.75, 0.9, 1, 1.05, 1.1, 1.25, 1.5].includes(exportSpeed) && <option value={exportSpeed}>{exportSpeed}×</option>}
+        </select>
+      </label>
+
       {!done ? (
         <button onClick={render} disabled={disabled} className="btn btn-primary w-full py-3 text-sm disabled:opacity-50">
           {running ? "Rendering…" : "Export video"}
@@ -59,9 +68,9 @@ export function Step4Output() {
         <>
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <button onClick={() => project?.videoUrl && downloadHref(`${slug}.mp4`, project.videoUrl)} className="btn btn-primary px-4 py-2 text-sm">Download MP4</button>
-            {project?.audioUrl && <button onClick={() => downloadHref(`${slug}.${audioExt}`, project.audioUrl!)} className="btn btn-ghost px-3 py-2 text-sm">Audio</button>}
-            {regions.length > 0 && <button onClick={() => downloadText(`${slug}.srt`, toSrt(regions))} className="btn btn-ghost px-3 py-2 text-sm">Captions (.srt)</button>}
-            {regions.length > 0 && <button onClick={() => downloadText(`${slug}.vtt`, toVtt(regions), "text/vtt")} className="btn btn-ghost px-3 py-2 text-sm">Captions (.vtt)</button>}
+            {project?.audioUrl && <button onClick={() => downloadHref(`${slug}.${audioExt}`, project.audioUrl!)} className="btn btn-ghost px-3 py-2 text-sm">Source audio</button>}
+            {regions.length > 0 && <button onClick={() => downloadText(`${slug}.srt`, toSrt(regions))} className="btn btn-ghost px-3 py-2 text-sm">Source captions (.srt)</button>}
+            {regions.length > 0 && <button onClick={() => downloadText(`${slug}.vtt`, toVtt(regions), "text/vtt")} className="btn btn-ghost px-3 py-2 text-sm">Source captions (.vtt)</button>}
           </div>
           <div className="flex items-center gap-3">
             <button onClick={reRender} disabled={disabled} className="mono text-[11px] text-[var(--color-text-muted)] hover:text-[var(--color-text)] disabled:opacity-40">Export again</button>

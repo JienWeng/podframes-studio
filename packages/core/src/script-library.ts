@@ -2,15 +2,18 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 /** Small, editable reference excerpts loaded fresh for each drafting/delivery pass. */
-export async function loadScriptExamples(root: string, language = "en"): Promise<string> {
+export async function loadScriptExamples(root: string, language = "en", styleNote = ""): Promise<string> {
   const directory = join(root, "examples", "script-library");
   let entries;
   try { entries = await readdir(directory, { withFileTypes: true }); }
   catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return ""; throw error; }
   const files = entries.filter((entry) => entry.isFile() && entry.name.endsWith(".md")).map((entry) => entry.name).sort();
   const locale = language.toLowerCase().split(/[-_]/)[0];
+  const profile = /source-led explainer/i.test(styleNote) ? "profile-source-led-explainer.md" : undefined;
   const local = files.filter((file) => file.startsWith(`${locale}-`));
   const selected = (local.length ? local : files.filter((file) => file.startsWith("en-"))).slice(0, 4);
+  if (profile && files.includes(profile)) selected.splice(0, 0, profile);
+  if (selected.length > 4) selected.length = 4;
   if (!selected.length) return "";
   const examples = await Promise.all(selected.map(async (file) => {
     const text = await readFile(join(directory, file), "utf8");

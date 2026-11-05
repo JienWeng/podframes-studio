@@ -54,3 +54,17 @@ test("imported pipeline skips drafting and resumes unchanged audio without spend
   assert.equal(project.stageDone("speech"), false);
   await assert.rejects(access(project.abs("audio/keep.mp3")));
 });
+
+ test("solo and six-speaker casts preserve speaker identity through import", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "podframes-cast-test-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const cast = Array.from({ length: 6 }, (_, index) => ({ ...hosts[0], id: `host_${String.fromCharCode(97 + index)}`, speaker: `HOST_${String.fromCharCode(65 + index)}`, name: `Person ${index}` }));
+  const project = await Project.create({ topic: "Panel", hosts: cast }, root, "panel");
+  const script = parsePastedScript(cast.map((host) => `${host.speaker}: Hello from ${host.name}.`).join("\n"), cast);
+  assert.deepEqual(script.turns.map((turn) => turn.hostId), cast.map((host) => host.id));
+  await generateProject(project, { script, only: ["script"], console: false });
+  assert.equal((await Project.load(root, "panel"))?.state.config.hosts.length, 6);
+  const solo = [cast[2]!];
+  assert.deepEqual(parsePastedScript("HOST_C: First.\nC: Second.", solo).turns.map((turn) => turn.hostId), ["host_c", "host_c"]);
+  await Project.create({ topic: "Solo", hosts: solo }, root, "solo");
+});

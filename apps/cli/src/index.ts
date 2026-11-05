@@ -58,9 +58,11 @@ OPTIONS
   --heygen-auth <mode> subscription (default) | api
   --treatment <t>      minimal (default) | editorial | cinematic
   --no-stickers        Disable automatic quote sticker direction
-  --broll-source <s>  images (default) | pexels (requires PEXELS_API_KEY)
+  --broll-source <s>  images (default) | pexels | ai-video
+  --broll-video-model <m> h3-max-turbo | ltx-fast | ltx-pro
   --captions <s>       clean | karaoke | highlight | neon | slam | bold | gradient | boxed
   --resolution <r>     720p (default) | 1080p
+  --export-speed <n>   Final playback speed, 0.75–1.5 (default 1)
   --draft              Fast, lower-quality render (good for iterating)
 
   --from <stage>       Start at this stage
@@ -166,6 +168,8 @@ async function main(): Promise<void> {
       expressiveness: { type: "string" },
       treatment: { type: "string" },
       "broll-source": { type: "string" },
+      "broll-video-model": { type: "string" },
+      "export-speed": { type: "string" },
       "no-stickers": { type: "boolean" },
       captions: { type: "string" },
       resolution: { type: "string" },
@@ -227,10 +231,12 @@ async function main(): Promise<void> {
         ...(values["heygen-auth"] ? { heygenAuth: values["heygen-auth"] as "subscription" | "api" } : {}),
         ...(values.expressiveness ? { heygenExpressiveness: values.expressiveness as "low" | "medium" | "high" } : {}),
         ...(values["no-stickers"] ? { autoStickers: false } : {}),
-        ...(values["broll-source"] ? { brollSource: values["broll-source"] as "images" | "pexels", showBroll: true } : {}),
+        ...(values["broll-video-model"] ? { brollVideoModel: values["broll-video-model"] as "ltx-fast" | "ltx-pro" | "h3-max-turbo" } : {}),
+        ...(values["broll-source"] ? { brollSource: values["broll-source"] as "images" | "pexels" | "ai-video", showBroll: true } : {}),
         ...(values.treatment ? { visualTreatment: values.treatment as VisualTreatment } : {}),
         ...(values.captions ? { captionStyle: values.captions as CaptionStyle } : {}),
         ...(values.resolution ? { videoResolution: values.resolution === "1080p" ? "1080p" : "720p" } : {}),
+        ...(values["export-speed"] ? { exportSpeed: Number(values["export-speed"]) } : {}),
         ...(values.draft ? { renderQuality: "draft" as const } : {}),
       },
     };

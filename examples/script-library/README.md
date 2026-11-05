@@ -9,3 +9,9 @@ Edit the files here to refine the show's taste. Add short excerpts from your own
 A useful example contains a few turns, the interaction you want, and a short explanation of what to learn. Mark bad examples **Avoid** and good examples **Better**. Include varied openings, real follow-ups, corrections, uncertainty, brief reactions, different turn lengths, restrained delivery, and endings that do not sound like a speech. Avoid filling the library with only jokes or only fact-dumping interviews.
 
 Use fictional situations or clearly identified style-only excerpts. The writer must still check live sources for the actual episode. Do not put secrets or unrelated instructions here: the selected excerpts are sent to the configured Codex task.
+
+## Uploaded video reference
+
+In Studio's Script step, choose **Use reference style · Source-led explainer**. This sets the saved Style field and loads `profile-source-led-explainer.md` for new drafting, replacing the fourth regular excerpt within the four-reference budget. CLI/API clients can include `source-led explainer` in `styleNote`. The B-roll planner also receives this style and requests supporting visuals at attributed claims.
+
+The profile records sampled visual observations and approximate local transcription of the user's 160.6-second reference. It emphasizes presenter-led chronology, short reactions, explicit attribution, and uncertainty. Actual article screenshots and event footage still require supplied assets. Source capture, highlighted article panels, and bilingual subtitle generation are not added by this profile.

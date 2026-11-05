@@ -6,7 +6,7 @@ The installer prepares dependencies and builds the app. You complete provider lo
 
 ## 1. Prepare the machine
 
-As an initial sizing estimate, use **4 vCPUs, 8 GB RAM, and 60 GB free SSD space** for short episodes. This is not a benchmark or minimum guarantee. More RAM/CPU helps local Whisper, browser rendering, and the production build; episode media can consume much more disk. A GPU is optional: Ubuntu setup selects software rendering. Keep project storage on a persistent local disk, not a temporary VM disk or network-mounted SQLite database.
+For one active video job, plan **8 dedicated vCPUs, 16 GB RAM, and 250 GB persistent SSD space**; 32 GB RAM and 500 GB SSD provide more room for rendering and retained media. These are planning recommendations, not benchmarked minimum requirements. See [deployment sizing](DEPLOYMENT.md#machine-sizing) for Mac recommendations and measured example storage. More RAM/CPU helps local Whisper, browser rendering, and the production build; episode media can consume much more disk. A GPU is optional: Ubuntu setup selects software rendering. Keep project storage on a persistent local disk, not a temporary VM disk or network-mounted SQLite database.
 
 Use a dedicated regular account with a writable home directory. Do not run the app as root. The Ubuntu installer needs `sudo` to install operating-system packages. Allow outbound HTTPS for package downloads, provider calls, model downloads, and live research. Keep port 3000 private; the supplied launcher binds to `127.0.0.1`.
 
@@ -64,6 +64,8 @@ cd "$HOME/podframes"
 nano .env.local
 ```
 
+If you have an existing settings file without owner access, run `bash scripts/setup.sh access`. It adds a random token without printing it or replacing existing credentials. An existing short token must be replaced deliberately; the command will explain this without changing it.
+
 Keep the generated `PODFRAMES_API_TOKEN`. If you brought an existing file, ensure the token contains at least 32 characters. You can generate a replacement locally with:
 
 ```sh
@@ -90,7 +92,7 @@ PODFRAMES_DAILY_GENERATION_LIMIT=30
 PODFRAMES_MAX_EPISODE_SECONDS=180
 ```
 
-These are input/operation limits, not spending caps. CLI runs bypass the HTTP operation budget. Choose provider billing limits separately. Keep `PODFRAMES_LOCAL_ONLY` unset: this setup uses the owner token even through localhost.
+These are input/operation limits, not spending caps. CLI runs bypass the HTTP operation budget. Choose provider billing limits separately. For a private Mac bound to `127.0.0.1`, set `PODFRAMES_LOCAL_ONLY=true` to open Studio without a username/password prompt. Keep the owner token: versioned automation APIs still require Bearer authentication. Direct loopback requests only qualify; remote/forwarded requests and cross-site mutations remain blocked or authenticated. Do not enable this mode behind a public reverse proxy. Leave it unset for authenticated browser access.
 
 ## 3. Authenticate on the machine running Podframes
 
@@ -140,6 +142,7 @@ Use the printed browser flow; if needed, tunnel its actual localhost callback po
 ```sh
 cd "$HOME/podframes"
 pnpm podframes doctor
+bash scripts/run-service.sh check
 ```
 
 Resolve missing tools, sessions, model, or video credentials before generating. The setup build does not require provider authentication, but generation does. `doctor` checks readiness; it does not prove every remote generation permission or complete a test episode.
@@ -173,7 +176,9 @@ cd "$HOME/podframes"
 bash scripts/setup.sh services
 ```
 
-This installs both services without running any generation automatically. It does not interrupt an already loaded macOS worker. Install only one service pair per account, and do not start a second foreground worker alongside it.
+This validates the production build and owner token before installing either service. It preserves existing settings and gives a repair instruction if a required dependency, build, or token is missing. Provider logins are checked separately by `doctor`.
+
+Installing services does not create new generation jobs. **Any jobs already queued can begin immediately when the worker starts.** It does not interrupt an already loaded macOS worker. Install only one service pair per account, and do not start a second foreground worker alongside it.
 
 ### Ubuntu systemd user services
 
@@ -246,17 +251,21 @@ Use `bash scripts/setup.sh` again only when dependencies need repair/update. It 
 
 ## Backup and move to another machine
 
-While both services and any CLI generation are stopped, copy these to encrypted storage:
+Use the local backup helper after all generation is idle. It snapshots `projects/`, `library/`, `episodes/`, `examples/script-library/` and `.automation/`, uses SQLite's online backup API (including committed WAL data), and verifies every copied file with SHA256. It does not start or stop services.
 
-- `projects/`: episode state, paid artifacts, remote-job receipts, and final videos.
-- `library/`: saved cast and series.
-- `.automation/`: SQLite queue, event history, worker state, and HTTP receipts. Copy the entire directory while idle, including any SQLite sidecar files.
-- `.env.local` and any `.env`: secrets and settings; restrict access.
-- Any custom `episodes/` or `examples/script-library/` content you want to retain.
+```sh
+python3 scripts/backup.py backup /path/to/podframes /private/backups/podframes-2026-11-05 --confirm-generation-idle
+python3 scripts/backup.py verify /private/backups/podframes-2026-11-05
+python3 scripts/backup.py restore /private/backups/podframes-2026-11-05 /private/restore-test
+```
 
-Install a fresh checkout on the destination, stop its services, restore those files with the destination account as owner, and authenticate providers there. Restore `chmod 600 .env.local`. Preserve the same episode slugs and provider-job files. Never run original and restored workers simultaneously against copied queued/paid jobs: local SQLite and project locks cannot coordinate across machines.
+Backup and restore destinations must be new directories outside the source. **Backups are unencrypted** and contain private scripts/media. Store them on encrypted storage; encrypt before off-host transfer. `.env*`, provider login directories and lock files are excluded. Back up credentials separately with appropriate encryption, or authenticate again. No off-host destination or encryption is configured automatically.
 
-Recheck old queued/interrupted jobs before starting a restored worker. A restored `queued` job can be claimed immediately. Do not restore stale provider state and blindly regenerate; the remote request may already have spent credits. Local CLI authentication directories are secrets, separate from app data; prefer fresh login on the destination. VM snapshots containing them need equivalent protection.
+Restore verifies the manifest before copying and checks restored hashes. It intentionally restores queue/history under `.automation.recovery`, not `.automation`, so copied jobs cannot be claimed automatically. It starts no worker. Inspect episode JSON, open a restored MP4 and run SQLite `PRAGMA integrity_check` on `.automation.recovery/state.sqlite` during a recovery drill.
+
+For actual migration, install a fresh checkout and keep destination services stopped. Copy restored project/library/script directories into it. Preserve episode slugs and paid provider-job receipts. Review copied queued/interrupted jobs and reconcile remote paid requests before intentionally activating `.automation.recovery` as `.automation`. Never run original and restored workers simultaneously against copied jobs: local locks cannot coordinate across machines. Authenticate providers on the destination, recreate protected env settings, run setup checks, then start services. Do not blindly regenerate uncertain paid requests.
+
+A successful local restore drill verifies data recovery only; off-host encrypted retention and a destination-machine recovery drill remain separate deployment requirements.
 
 ## Troubleshooting
 
@@ -275,4 +284,6 @@ Recheck old queued/interrupted jobs before starting a restored worker. A restore
 | Worker crashed during a paid stage | Inspect saved artifacts and provider job status. Use the existing explicit interrupted-job acknowledgement only after reconciling the remote outcome. |
 | Disk nearly full | Back up completed episodes and intentionally delete old projects through Studio. Do not delete in-progress caches or remote-job receipts. Rotate macOS log files while services are stopped. |
 
-For episode commands, reuse, and recovery, see [automation](AUTOMATION.md). For a visual automation alternative, import the [n8n seven-stage workflow](N8N.md). For owner authentication, limits, idempotency, and endpoints, see [API](API.md). The separate hosted-web/Mac-worker architecture remains a [future deployment proposal](DEPLOYMENT.md).
+For episode commands, reuse, and recovery, see [automation](AUTOMATION.md). For a visual automation alternative, import the [n8n seven-stage workflow](N8N.md). For owner authentication, limits, idempotency, and endpoints, see [API](API.md). See [deployment choices and storage](DEPLOYMENT.md) for the current single-host recommendation and future hosted-web/Mac-worker proposal.
+
+Before treating the installation as an unattended service, complete the [service readiness checklist](SERVICE_READINESS.md).

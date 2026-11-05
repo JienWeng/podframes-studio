@@ -11,7 +11,7 @@ export type { GenerateOptions } from "./pipeline";
 
 export { Project } from "./project";
 export { slugify, slugForTopic, contentHash } from "./util/fs";
-export { pollBrollVideo } from "./clients/broll-video";
+export { pollBrollVideo, brollVideoStateFile } from "./clients/broll-video";
 export { searchPexelsVideos, getPexelsVideo } from "./clients/pexels";
 export type { PexelsVideo } from "./clients/pexels";
 export { validateConfig, validateOptions } from "./validate";

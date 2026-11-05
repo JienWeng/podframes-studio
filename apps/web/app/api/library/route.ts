@@ -21,7 +21,10 @@ function castHost(form: FormData): Host {
   if (!["fish/s2.1-pro", "fish/drama-3"].includes(model)) throw new Error("Choose S2.1 Pro or Drama 3.");
   const voice = text(form.get("voice"), "Fish voice ID", 128);
   if (!/^[a-z0-9_-]+$/i.test(voice)) throw new Error("Enter a valid Fish voice ID.");
+  const speechSpeed = Number(form.get("speechSpeed") ?? 1);
+  if (!Number.isFinite(speechSpeed) || speechSpeed < 0.75 || speechSpeed > 1.5) throw new Error("Speech speed must be 0.75–1.5.");
   const host: Host = {
+    speechSpeed,
     id: "host_a", speaker: "HOST_A", side: "left", model, voice,
     name: text(form.get("name"), "Name", 80),
     appearance: text(form.get("appearance") ?? "", "Appearance", 2000, false),
